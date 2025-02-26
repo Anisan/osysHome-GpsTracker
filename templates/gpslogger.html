@@ -1,0 +1,426 @@
+{% extends "layouts/module_admin.html" %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="GpsTracker">GpsTracker</a></li>
+{% endblock %}
+{% block module %}
+
+<script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<div id="gps_tracker">
+
+    <div v-if="message" class="alert alert-warning mt-3">
+        <p>[[ message ]]</p>
+    </div>
+
+    <ul class="nav nav-tabs mb-3" id="configTabs" role="tablist">
+        <li class="nav-item"><a class="nav-link tab-button active" href="#devices" data-bs-toggle="tab" role="tab">Devices</a></li>
+        <li class="nav-item"><a class="nav-link tab-button" href="#locations" data-bs-toggle="tab" role="tab">Location</a></li>
+        <li class="nav-item"><a class="nav-link tab-button" href="#positions" data-bs-toggle="tab" role="tab">Log</a></li>
+        <li class="nav-item"><a class="nav-link tab-button" href="#tab_map" data-bs-toggle="tab" role="tab">View</a></li>
+    </ul>
+    <div class="tab-content" id="myTabContent">
+        <div class="tab-pane fade show active" id="devices" role="tabpanel" aria-labelledby="general-tab">
+            <btn class="btn btn-primary btn-sm" role="button" @click="fetchDevices()">
+                <span v-if="loading == 'devices'" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <i v-else class="fas fa-rotate me-2"></i>
+                Refresh
+            </btn>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>ID</th>
+                            <th>Lat</th>
+                            <th>Lon</th>
+                            <th>Linked object</th>
+                            <th>Updated</th>
+                            <th>&nbsp;</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(item,key) in devices" :key="'devices_'+key">
+                            <td><b>[[ item.title ]]</b></td>
+                            <td>[[ item.device_id ]]</td>
+                            <td>[[ item.lat ]]</td>
+                            <td>[[ item.lon ]]</td>
+                            <td>[[ item.linked_object ]]</td>
+                            <td>[[ item.updated ]]</td>
+                            <td>
+                                <a class="btn btn-success ms-2 ms-auto btn-sm" @click="editDevice(item)" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                <a class="btn btn-danger ms-2 ms-auto btn-sm" @click="delDevice(item.id)" title="Delete"><i class="fas fa-trash"></i></a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="locations" role="tabpanel" aria-labelledby="general-tab">
+            <btn class="btn btn-primary btn-sm" role="button" @click="fetchLocation()">
+                <span v-if="loading == 'locations'" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <i v-else class="fas fa-rotate me-2"></i>
+                Refresh
+            </btn>
+            <btn class="btn btn-success ms-2 btn-sm" @click="addLocation()" title="Add"><i class="fas fa-pencil-alt"></i>Add</btn>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Lat</th>
+                            <th>Lon</th>
+                            <th>Range</th>
+                            <th>Home</th>
+                            <th>&nbsp;</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(item,index) in locations" :key="'locations_'+index">
+                            <td><b>[[ item.title ]]</b></td>
+                            <td>[[ item.lat ]]</td>
+                            <td>[[ item.lon ]]</td>
+                            <td>[[ item.range ]]</td>
+                            <td>[[ item.is_home ]]</td>
+                            <td>
+                                <a class="btn btn-success ms-2 ms-auto btn-sm" @click="editLocation(item)" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                <a class="btn btn-danger ms-2 ms-auto btn-sm" @click="delLocation(item.id)" title="Delete"><i class="fas fa-trash"></i></a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="positions" role="tabpanel" aria-labelledby="general-tab">
+            <btn class="btn btn-primary btn-sm" role="button" @click="fetchPositions()">
+                <span v-if="loading == 'positions'" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <i v-else class="fas fa-rotate me-2"></i>
+                Refresh
+            </btn>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead>
+                        <tr>
+                            <th>Device</th>
+                            <th>Added</th>
+                            <th>Lat</th>
+                            <th>Lon</th>
+                            <th>Alt</th>
+                            <th>Accuracy</th>
+                            <th>Speed</th>
+                            <th>Battery</th>
+                            <th>Provider</th>
+                            <th>Location</th>
+                            <th>&nbsp;</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(item,index) in positions" :key="'pos_'+index">
+                            <td v-if="item.device_id in devices">[[ devices[item.device_id].title ]]</td>
+                            <td v-else>[[item.device_id]]</td>
+                            <td>[[ item.added ]]</td>
+                            <td>[[ item.lat ]]</td>
+                            <td>[[ item.lon ]]</td>
+                            <td>[[ item.alt ]]</td>
+                            <td>[[ item.accuracy ]]</td>
+                            <td>[[ item.speed ]]</td>
+                            <td>[[ item.battery ]]% <i v-if="item.charging" class="fas fa-bolt ms-2 text-danger"></i></td>
+                            <td>[[ item.provider ]]</td>
+                            <td>
+                                <a v-if="item.address" :href="'https://static-maps.yandex.ru/1.x/?ll='+item.lon+','+item.lat+'&size=650,450&z=17&l=map&pt='+item.lon+','+item.lat+',pm2blm'" target="_blank">[[ item.address ]]</a>
+                                <a v-else :href="'https://static-maps.yandex.ru/1.x/?ll='+item.lon+','+item.lat+'&size=650,450&z=17&l=map&pt='+item.lon+','+item.lat+',pm2blm'" target="_blank">Unknown position</a>
+                            </td>
+                            <td>
+                                <a class="btn btn-danger ms-2 ms-auto btn-sm" @click="delPosition(item)" title="Delete"><i class="fas fa-trash"></i></a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="tab_map" role="tabpanel" aria-labelledby="general-tab">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"></style>
+            <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+            <script src="https://unpkg.com/vue2-leaflet@2.6.0/dist/vue2-leaflet.min.js"></script>
+            <div class="vh-100">
+                <l-map :zoom.sync="zoom" :center="center" :options="mapOptions"  :bounds="bounds"
+                ref="mymap">
+                    <l-tile-layer :url="provider.url"
+                    :subdomains="provider.subdomains" :attribution="attribution"
+                    :reuseTiles="reuseTiles" :updateWhenIdle="updateWhenIdle" />
+                    <l-circle v-for="location in locations" :key="'loc_'+location.id" :lat-lng="[location.lat, location.lon]"
+                        :radius="location.range" :name="location.title">
+                        <l-tooltip :content="location.title" />
+                    </l-circle>
+                </l-map>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно -->
+    <div class="modal fade" id="deviceModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Device</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div v-if="edit_device" class="modal-body">
+                    <div>
+                        <label class="form-label">Title</label>
+                        <input class="form-control" v-model="edit_device.title">
+                    </div>
+                    <div>
+                        <label class="form-check-label" for="flexCheckDefault">
+                            Linked object
+                        </label>
+                        <select-with-filter placeholder="Select object" :options="objectOptions" v-model="edit_device.linked_object"></select-with-filter>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" data-bs-dismiss="modal" @click="updateDevice()">Save</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Модальное окно -->
+<div class="modal fade" id="locationModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">Device</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div v-if="edit_location" class="modal-body">
+                <div>
+                    <label class="form-label">Title</label>
+                    <input class="form-control" v-model="edit_location.title">
+                </div>
+                <div>
+                    <label class="form-label">Lat</label>
+                    <input class="form-control" v-model="edit_location.lat">
+                </div>
+                <div>
+                    <label class="form-label">Lon</label>
+                    <input class="form-control" v-model="edit_location.lon">
+                </div>
+                <div>
+                    <label class="form-label">Range</label>
+                    <input class="form-control" v-model="edit_location.range">
+                </div>
+                <div class="mt-2">
+                    <label class="form-label">Home</label>
+                    <input type="checkbox" class="form-check-control" v-model="edit_location.is_home">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal" @click="updateLocation()">Save</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+<script src="{{ config.ASSETS_ROOT }}/js/components/select-with-filter.js"></script>
+
+
+<script>
+    new Vue({
+        el: '#gps_tracker',
+        delimiters: ['[[', ']]'], // Измененные разделители
+        data: {
+            zoom: 10,
+            center: [47.41322, -1.219482],
+            mapOptions: {
+                zoomSnap: 0.5,
+                zoomControl: true,
+                attributionControl: false,
+            },
+            attribution: "",
+            bounds: null,
+            reuseTiles: true,
+            updateWhenIdle: false,
+            provider: { id: 1, title: "2GIS", url: "http://tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}", subdomains: null },
+            loading: "",
+            devices: {},
+            locations: [],
+            positions:[],
+            message: '',
+            edit_device: null,
+            edit_location: null,
+            objects:{}
+        },
+        components: {
+            'l-map': window.Vue2Leaflet.LMap,
+            'l-tile-layer': window.Vue2Leaflet.LTileLayer,
+            'l-circle': window.Vue2Leaflet.LCircle,
+            'l-tooltip': window.Vue2Leaflet.LTooltip,
+        },
+        async created() {
+            await this.fetchObjects()
+            await this.fetchDevices()
+            await this.fetchLocations()
+            await this.fetchPositions()
+        },
+        mounted(){
+        },
+        computed:{
+            objectOptions(){
+                list = {}
+                Object.keys(this.objects).forEach(key => {
+                    list[key] = this.objects[key].description
+                });
+                return list
+            }
+        },
+        
+        methods: {
+            fetchObjects(){
+                axios.get(`/api/object/list/details`)
+                    .then(response => {
+                        this.objects = response.data.result
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching: ' + error;
+                    });
+            },
+            fetchDevices(){
+                loading = "devices"
+                axios.get(`/api/GpsTracker/devices`)
+                    .then(response => {
+                        devs = response.data.result
+                        tmp = {}
+                        devs.forEach(element => {
+                            tmp[element.id] = element
+                        });
+                        this.devices = tmp
+                        loading = ""
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching: ' + error;
+                        loading = ""
+                    });
+            },
+            fetchLocations(){
+                loading = "locations"
+                axios.get(`/api/GpsTracker/locations`)
+                    .then(response => {
+                        this.locations = response.data.result
+                        loading = ""
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching: ' + error;
+                        loading = ""
+                    });
+            },
+            fetchPositions(){
+                loading = "positions"
+                axios.get(`/api/GpsTracker/log?per_page=50`)
+                    .then(response => {
+                        this.positions = response.data.result
+                        loading = ""
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching: ' + error;
+                        loading = ""
+                    });
+            },
+            delDevice(id) {
+                axios.delete(`/api/GpsTracker/device/${id}`)
+                    .then(response => {
+                        console.log(response.data)
+                        this.fetchDevices()
+                        this.fetchPositions()
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching device: ' + error;
+                    });
+            },
+            editDevice(item){
+                this.edit_device={...item}
+                console.log(this.edit_device)
+                $('#deviceModal').modal('show');
+            },
+            updateDevice(){
+                var id = this.edit_device.id
+                axios.post(`/api/GpsTracker/device/${id}`, this.edit_device)
+                    .then(response => {
+                        console.log(response.data)
+                        this.fetchDevices()
+                        this.edit_device=null
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching device: ' + error;
+                        this.edit_device=null
+                    });
+            },
+            addLocation(){
+                this.edit_location={}
+                $('#locationModal').modal('show');
+            },
+            editLocation(item){
+                this.edit_location={...item}
+                $('#locationModal').modal('show');
+            },
+            delLocation(id) {
+                axios.delete(`/api/GpsTracker/location/${id}`)
+                    .then(response => {
+                        console.log(response.data)
+                        this.fetchLocations()
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching device: ' + error;
+                    });
+            },
+            updateLocation(){
+                var url = `/api/GpsTracker/location`
+                axios.post(url, this.edit_location)
+                    .then(response => {
+                        console.log(response.data)
+                        this.fetchLocations()
+                        this.edit_location=null
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching device: ' + error;
+                        this.edit_device=null
+                    });
+            },
+            delPosition(item) {
+                const index = this.positions.findIndex(n => n.id === item.id);
+                if (index !== -1) {
+                    this.positions.splice(index, 1);
+                }
+                axios.delete(`/api/GpsTracker/position/${item.id}`)
+                    .then(response => {
+                        console.log(response.data)
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching device: ' + error;
+                    });
+            },
+           
+        }
+    });
+</script>
+
+{% endblock %}

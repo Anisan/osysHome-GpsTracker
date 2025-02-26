@@ -1,0 +1,340 @@
+from flask import request,jsonify
+from flask_restx import Namespace, Resource,fields, reqparse
+from sqlalchemy import delete, desc
+from app.api.decorators import api_key_required, role_required
+from app.api.models import model_404, model_result
+from app.database import row2dict, session_scope
+from app.core.lib.object import getProperty
+from plugins.GpsTracker import GpsTracker
+from plugins.GpsTracker.models.GpsDevice import GpsDevice
+from plugins.GpsTracker.models.GpsLocation import GpsLocation
+from plugins.GpsTracker.models.GpsPosition import GpsPosition
+import datetime
+
+_api_ns = Namespace(name="GpsTracker", description="GpsTracker namespace", validate=True)
+
+response_result = _api_ns.model("Result", model_result)
+response_404 = _api_ns.model("Error", model_404)
+
+_instance: GpsTracker = None
+
+
+def create_api_ns(instance:GpsTracker):
+    global _instance
+    _instance = instance
+    return _api_ns
+
+@_api_ns.route("/devices", endpoint="gpstracker_devices")
+class GetDevices(Resource):
+    @api_key_required
+    @role_required("user")
+    def get(self):
+        with session_scope() as session:
+            devices = session.query(GpsDevice).all()
+            result = [row2dict(device) for device in devices]
+            for item in result:
+                if item['linked_object']:
+                    item['user'] = getProperty(item['linked_object']+".description")
+                    item['avatar'] = getProperty(item['linked_object']+".image")
+                    item['color'] = getProperty(item['linked_object']+".color")
+                    item['home_distance'] = getProperty(item['linked_object']+".home_distance")
+            return {"success": True, "result": result}, 200
+
+@_api_ns.route("/device/<device_id>", endpoint="gpstracker_device")
+class EndpointGpsDevice(Resource):
+    @api_key_required
+    @role_required("user")
+    def get(self,device_id: int):
+        """ Get device """
+        with session_scope() as session:
+            device = session.query(GpsDevice).filter(GpsDevice.id == device_id).one_or_none()
+            if device:
+                result = row2dict(device)
+                return {"success": True, "result": result}, 200
+            return {"success": False, "msg": "Task not found"}, 404
+    @api_key_required
+    @role_required("user")
+    def post(self,device_id:int):
+        """ Create/update device """
+        with session_scope() as session:
+            data = request.get_json()
+            if data["id"]:
+                device = session.query(GpsDevice).filter(GpsDevice.id == device_id).one()
+            else:
+                device = GpsDevice()
+                session.add(device)
+            device.title = data['title']
+            device.linked_object = data['linked_object']
+            session.commit()
+            return {"success": True}, 200
+    @api_key_required
+    @role_required("user")
+    def delete(self,device_id:int):
+        """ Delete device """
+        with session_scope() as session:
+            sql = delete(GpsPosition).where(GpsPosition.device_id == int(device_id))
+            session.execute(sql)
+            sql = delete(GpsDevice).where(GpsDevice.id == int(device_id))
+            session.execute(sql)
+            session.commit()
+            return {"success": True}, 200
+
+@_api_ns.route("/locations", endpoint="gpstracker_locations")
+class GetLocations(Resource):
+    @api_key_required
+    @role_required("user")
+    def get(self):
+        with session_scope() as session:
+            locations = session.query(GpsLocation).all()
+            result = [row2dict(location) for location in locations]
+            return {"success": True, "result": result}, 200
+
+@_api_ns.route('/location', methods=['POST'])
+@_api_ns.route("/location/<location_id>", methods=['GET','DELETE'])
+class EndpointGpsLocation(Resource):
+    @api_key_required
+    @role_required("user")
+    def get(self,location_id: int):
+        """ Get location """
+        with session_scope() as session:
+            location = session.query(GpsLocation).filter(GpsLocation.id == location_id).one_or_none()
+            if location:
+                result = row2dict(location)
+                return {"success": True, "result": result}, 200
+            return {"success": False, "msg": "Task not found"}, 404
+    @api_key_required
+    @role_required("user")
+    def post(self):
+        """ Create/update location """
+        with session_scope() as session:
+            data = request.get_json()
+            if data.get("id",None):
+                location = session.query(GpsLocation).filter(GpsLocation.id == data["id"]).one()
+            else:
+                location = GpsLocation()
+                session.add(location)
+            location.title = data.get('title',None)
+            location.lat = data.get('lat',None)
+            location.lon = data.get('lon',None)
+            location.range = data.get('range',None)
+            location.is_home = data.get('is_home',False)
+            session.commit()
+            return {"success": True}, 200
+    @api_key_required
+    @role_required("user")
+    def delete(self,location_id:int):
+        """ Delete location """
+        with session_scope() as session:
+            sql = delete(GpsLocation).where(GpsLocation.id == int(location_id))
+            session.execute(sql)
+            session.commit()
+            return {"success": True}, 200
+
+
+_parser = _api_ns.parser()
+_parser.add_argument('start_time', type=str, help='Start time for filtering logs in ISO format')
+_parser.add_argument('end_time', type=str, help='End time for filtering logs in ISO format')
+_parser.add_argument('device_id', type=str, help='Device ID to filter logs')
+_parser.add_argument('page', type=int, default=1, help='Page number for pagination (default is 1)')
+_parser.add_argument('per_page', type=int, help='Number of items per page (default is 10)')
+
+
+@_api_ns.route("/log", endpoint="gpstracker_logs")
+class GetLogs(Resource):
+    @api_key_required
+    @role_required("user")
+    @_api_ns.doc(params={
+        'start_time': 'Start time for filtering logs in ISO format',
+        'end_time': 'End time for filtering logs in ISO format',
+        'device_id': 'Device ID to filter logs',
+        'page': 'Page number for pagination',
+        'per_page': 'Number of items per page'
+    })
+    def get(self):
+        args = _parser.parse_args()
+
+        start_time = args.get('start_time')
+        end_time = args.get('end_time')
+        device_id = args.get('device_id')
+        page = args.get('page', None)
+        per_page = args.get('per_page', None)
+
+        with session_scope() as session:
+            query = session.query(GpsPosition)
+
+            if start_time:
+                query = query.filter(GpsPosition.added >= start_time)
+            if end_time:
+                query = query.filter(GpsPosition.added <= end_time)
+            if device_id:
+                query = query.filter(GpsPosition.device_id == device_id)
+
+            # Пагинация
+            total = query.count()  # Общее количество записей
+            query = query.order_by(desc(GpsPosition.added))
+            if per_page and page:
+                logs = query.offset((page - 1) * per_page).limit(per_page).all()
+            else:
+                logs = query.all()
+
+            result = [row2dict(log) for log in logs]
+            data = {
+                "success": True,
+                "result": result,
+                "total": total,
+                "page": page,
+                "per_page": per_page,
+                "total_pages": ((total + per_page - 1) // per_page) if per_page else None
+            }
+
+            return data, 200
+
+
+gps_position_model = _api_ns.model('GpsPosition', {
+    'device': fields.String(required=True, description='Device name'),
+    'lat': fields.Float(required=True, description='Latitude'),
+    'lon': fields.Float(required=True, description='Longitude'),
+    'alt': fields.Float(description='Altitude'),
+    'accuracy': fields.Float(description='Accuracy'),
+    'peed': fields.Float(description='Speed'),
+    'battery': fields.Float(description='Battery level'),
+    'charging': fields.Boolean(description='Charging status'),
+    'provider': fields.String(description='Provider'),
+    'address': fields.String(description='Address'),
+    'added': fields.DateTime(description='Timestamp')
+})
+
+@_api_ns.route("/position", methods=['GET','POST'])
+@_api_ns.route("/position/<position_id>", methods=['DELETE'])
+class GpsPositionResource(Resource):
+    get_parser = reqparse.RequestParser()
+    get_parser.add_argument('device', type=str, required=True, location='args')
+    get_parser.add_argument('lat', type=float, required=True, location='args')
+    get_parser.add_argument('lon', type=float, required=True, location='args')
+    get_parser.add_argument('alt', type=float, required=False, location='args')
+    get_parser.add_argument('accuracy', type=float, required=False, location='args')
+    get_parser.add_argument('speed', type=float, required=False, location='args')
+    get_parser.add_argument('battery', type=float, required=False, location='args')
+    get_parser.add_argument('charging', type=bool, required=False, location='args')
+    get_parser.add_argument('provider', type=str, required=False, location='args')
+    get_parser.add_argument('address', type=str, required=False, location='args')
+    get_parser.add_argument('added', type=str, required=False, location='args')
+
+    @_api_ns.expect(get_parser)
+    @api_key_required
+    @role_required("user")
+    def get(self):
+        """ Save GPS position """
+        args = self.get_parser.parse_args()
+        _instance.addGpsPosition(**args)
+        return {'success': True}, 200
+
+    @_api_ns.expect(gps_position_model)
+    @api_key_required
+    @role_required("user")
+    def post(self):
+        """ Save GPS position """
+        data = request.get_json()
+        device_name = data.get('device')
+        lat = data.get('lat')
+        lon = data.get('lon')
+        alt = data.get('alt')
+        accuracy = data.get('accuracy')
+        speed = data.get('speed')
+        battery = data.get('battery')
+        charging = data.get('charging')
+        provider = data.get('provider')
+        address = data.get('address')
+        added = data.get('added')
+
+        _instance.addGpsPosition(
+            device=device_name,
+            lat=lat,
+            lon=lon,
+            alt=alt,
+            accuracy=accuracy,
+            speed=speed,
+            battery=battery,
+            charging=charging,
+            provider=provider,
+            address=address,
+            added=added
+        )
+
+        return {'success': True}, 201
+
+    @api_key_required
+    @role_required("user")
+    def delete(self,position_id:int):
+        """ Delete position """
+        with session_scope() as session:
+            sql = delete(GpsPosition).where(GpsPosition.id == int(position_id))
+            session.execute(sql)
+            session.commit()
+            return {"success": True}, 200
+
+@_api_ns.route('/owntracks', methods=['POST'])
+class OwnTracks(Resource):
+    @api_key_required
+    @role_required("user")
+    def post(self):
+        # Обработка входящих данных от Owntracks
+        data = request.get_json()
+        _instance.logger.info(data)
+        if not data:
+            return {'error': 'No JSON data provided'}, 400
+
+        required_fields = {'_type'}
+        if not required_fields.issubset(data.keys()):
+            return {'error': 'Missing required fields'}, 400
+        
+        result = []
+
+        if data["_type"] == 'location':
+            # store information from given datapoint
+            _instance.addGpsPosition(
+                device=data["tid"],
+                lat=data["lat"],
+                lon=data["lon"],
+                alt=data["alt"],
+                accuracy=data["acc"],
+                speed=data["vel"],
+                battery=data["batt"],
+                charging=data["bs"] == 2,
+                provider='owntracks',
+                added=datetime.datetime.fromtimestamp(data["tst"])
+            )
+            # send friends
+            with session_scope() as session:
+                devs = session.query(GpsDevice).filter(
+                    GpsDevice.device_id != data["tid"],
+                    GpsDevice.linked_object.isnot(None)
+                ).all()
+                for dev in devs:
+                    location = session.query(GpsLocation).filter(GpsPosition.device_id == dev.id, )
+                    location = {
+                        "_type":"location",
+                        "tid":dev.linked_object,
+                        "lat":dev.lat,
+                        "lon":dev.lon,
+                        "tst":int(dev.updated.timestamp())
+                    }
+                    last_location = session.query(GpsPosition).filter(GpsPosition.device_id == dev.id).order_by(desc(GpsPosition.added)).first()
+
+                    if last_location:
+                        location = {
+                            "_type":"location",
+                            "tid":dev.linked_object,
+                            "lat":last_location.lat,
+                            "lon":last_location.lon,
+                            "alt":last_location.alt,
+                            "batt":last_location.battery,
+                            "bs": "2" if last_location.charging else "1",
+                            "vel":last_location.speed,
+                            "acc":last_location.accuracy,
+                            "tst":int(last_location.added.timestamp())
+                        }
+
+                    result.append(location)
+
+        return result, 200

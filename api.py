@@ -1,15 +1,18 @@
-from flask import request,jsonify
+from flask import request
 from flask_restx import Namespace, Resource,fields, reqparse
 from sqlalchemy import delete, desc
 from app.api.decorators import api_key_required, role_required
 from app.api.models import model_404, model_result
 from app.database import row2dict, session_scope
-from app.core.lib.object import getProperty
+from app.core.lib.object import getProperty, getObject
 from plugins.GpsTracker import GpsTracker
 from plugins.GpsTracker.models.GpsDevice import GpsDevice
 from plugins.GpsTracker.models.GpsLocation import GpsLocation
 from plugins.GpsTracker.models.GpsPosition import GpsPosition
 import datetime
+import base64
+import os
+from settings import Config
 
 _api_ns = Namespace(name="GpsTracker", description="GpsTracker namespace", validate=True)
 
@@ -34,10 +37,10 @@ class GetDevices(Resource):
             result = [row2dict(device) for device in devices]
             for item in result:
                 if item['linked_object']:
-                    item['user'] = getProperty(item['linked_object']+".description")
-                    item['avatar'] = getProperty(item['linked_object']+".image")
-                    item['color'] = getProperty(item['linked_object']+".color")
-                    item['home_distance'] = getProperty(item['linked_object']+".home_distance")
+                    item['user'] = getProperty(item['linked_object'] + ".description")
+                    item['avatar'] = getProperty(item['linked_object'] + ".image")
+                    item['color'] = getProperty(item['linked_object'] + ".color")
+                    item['home_distance'] = getProperty(item['linked_object'] + ".home_distance")
             return {"success": True, "result": result}, 200
 
 @_api_ns.route("/device/<device_id>", endpoint="gpstracker_device")
@@ -287,7 +290,7 @@ class OwnTracks(Resource):
         required_fields = {'_type'}
         if not required_fields.issubset(data.keys()):
             return {'error': 'Missing required fields'}, 400
-        
+
         result = []
 
         if data["_type"] == 'location':
@@ -335,6 +338,20 @@ class OwnTracks(Resource):
                             "tst":int(last_location.added.timestamp())
                         }
 
-                    result.append(location)
+                        result.append(location)
+                        
+                        # obj = getObject(dev.linked_object)
 
+                        # card = {
+                        #     '_type': 'card',
+                        #     'tid': dev.linked_object,
+                        #     'name': obj.description,
+                        # }
+                        # path_image = "/opt/osyshome" + getProperty(dev.linked_object + ".image")
+                        # if os.path.isfile(path_image):
+                        #     with open(path_image, "rb") as image_file:
+                        #         card['face'] = base64.b64encode(image_file.read()).decode('utf-8')
+
+                        # result.append(card)
+                
         return result, 200

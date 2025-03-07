@@ -1,7 +1,8 @@
 from flask import request
 from flask_restx import Namespace, Resource,fields, reqparse
 from sqlalchemy import delete, desc
-from app.api.decorators import api_key_required, role_required
+from app.api.decorators import api_key_required
+from app.authentication.handlers import handle_user_required
 from app.api.models import model_404, model_result
 from app.database import row2dict, session_scope
 from app.core.lib.object import getProperty, getObject
@@ -10,9 +11,6 @@ from plugins.GpsTracker.models.GpsDevice import GpsDevice
 from plugins.GpsTracker.models.GpsLocation import GpsLocation
 from plugins.GpsTracker.models.GpsPosition import GpsPosition
 import datetime
-import base64
-import os
-from settings import Config
 
 _api_ns = Namespace(name="GpsTracker", description="GpsTracker namespace", validate=True)
 
@@ -30,7 +28,7 @@ def create_api_ns(instance:GpsTracker):
 @_api_ns.route("/devices", endpoint="gpstracker_devices")
 class GetDevices(Resource):
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def get(self):
         with session_scope() as session:
             devices = session.query(GpsDevice).all()
@@ -46,7 +44,7 @@ class GetDevices(Resource):
 @_api_ns.route("/device/<device_id>", endpoint="gpstracker_device")
 class EndpointGpsDevice(Resource):
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def get(self,device_id: int):
         """ Get device """
         with session_scope() as session:
@@ -56,7 +54,7 @@ class EndpointGpsDevice(Resource):
                 return {"success": True, "result": result}, 200
             return {"success": False, "msg": "Task not found"}, 404
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def post(self,device_id:int):
         """ Create/update device """
         with session_scope() as session:
@@ -71,7 +69,7 @@ class EndpointGpsDevice(Resource):
             session.commit()
             return {"success": True}, 200
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def delete(self,device_id:int):
         """ Delete device """
         with session_scope() as session:
@@ -85,7 +83,7 @@ class EndpointGpsDevice(Resource):
 @_api_ns.route("/locations", endpoint="gpstracker_locations")
 class GetLocations(Resource):
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def get(self):
         with session_scope() as session:
             locations = session.query(GpsLocation).all()
@@ -96,7 +94,7 @@ class GetLocations(Resource):
 @_api_ns.route("/location/<location_id>", methods=['GET','DELETE'])
 class EndpointGpsLocation(Resource):
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def get(self,location_id: int):
         """ Get location """
         with session_scope() as session:
@@ -106,7 +104,7 @@ class EndpointGpsLocation(Resource):
                 return {"success": True, "result": result}, 200
             return {"success": False, "msg": "Task not found"}, 404
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def post(self):
         """ Create/update location """
         with session_scope() as session:
@@ -124,7 +122,7 @@ class EndpointGpsLocation(Resource):
             session.commit()
             return {"success": True}, 200
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def delete(self,location_id:int):
         """ Delete location """
         with session_scope() as session:
@@ -145,7 +143,7 @@ _parser.add_argument('per_page', type=int, help='Number of items per page (defau
 @_api_ns.route("/log", endpoint="gpstracker_logs")
 class GetLogs(Resource):
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     @_api_ns.doc(params={
         'start_time': 'Start time for filtering logs in ISO format',
         'end_time': 'End time for filtering logs in ISO format',
@@ -225,7 +223,7 @@ class GpsPositionResource(Resource):
 
     @_api_ns.expect(get_parser)
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def get(self):
         """ Save GPS position """
         args = self.get_parser.parse_args()
@@ -234,7 +232,7 @@ class GpsPositionResource(Resource):
 
     @_api_ns.expect(gps_position_model)
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def post(self):
         """ Save GPS position """
         data = request.get_json()
@@ -267,7 +265,7 @@ class GpsPositionResource(Resource):
         return {'success': True}, 201
 
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def delete(self,position_id:int):
         """ Delete position """
         with session_scope() as session:
@@ -279,7 +277,7 @@ class GpsPositionResource(Resource):
 @_api_ns.route('/owntracks', methods=['POST'])
 class OwnTracks(Resource):
     @api_key_required
-    @role_required("user")
+    @handle_user_required
     def post(self):
         # Обработка входящих данных от Owntracks
         data = request.get_json()

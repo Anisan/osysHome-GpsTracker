@@ -11,6 +11,10 @@ from plugins.GpsTracker.models.GpsDevice import GpsDevice
 from plugins.GpsTracker.models.GpsLocation import GpsLocation
 from plugins.GpsTracker.models.GpsPosition import GpsPosition
 import datetime
+import time
+import os
+import base64
+from app.extensions import cache
 
 _api_ns = Namespace(name="GpsTracker", description="GpsTracker namespace", validate=True)
 
@@ -281,7 +285,7 @@ class OwnTracks(Resource):
     def post(self):
         # Обработка входящих данных от Owntracks
         data = request.get_json()
-        _instance.logger.info(data)
+        _instance.logger.debug(data)
         if not data:
             return {'error': 'No JSON data provided'}, 400
 
@@ -305,6 +309,9 @@ class OwnTracks(Resource):
                 provider='owntracks',
                 added=datetime.datetime.fromtimestamp(data["tst"])
             )
+            current_time = time.time()
+            last_execution = cache.get("gps_ls_" + data["tid"])
+
             # send friends
             with session_scope() as session:
                 devs = session.query(GpsDevice).filter(
@@ -312,7 +319,6 @@ class OwnTracks(Resource):
                     GpsDevice.linked_object.isnot(None)
                 ).all()
                 for dev in devs:
-                    location = session.query(GpsLocation).filter(GpsPosition.device_id == dev.id, )
                     location = {
                         "_type":"location",
                         "tid":dev.linked_object,
@@ -337,19 +343,29 @@ class OwnTracks(Resource):
                         }
 
                         result.append(location)
-                        
-                        # obj = getObject(dev.linked_object)
 
-                        # card = {
-                        #     '_type': 'card',
-                        #     'tid': dev.linked_object,
-                        #     'name': obj.description,
-                        # }
-                        # path_image = "/opt/osyshome" + getProperty(dev.linked_object + ".image")
-                        # if os.path.isfile(path_image):
-                        #     with open(path_image, "rb") as image_file:
-                        #         card['face'] = base64.b64encode(image_file.read()).decode('utf-8')
+                        # Check if we need to include card info (once per hour)
+                        try:
+                            if last_execution is None or current_time - last_execution >= 3600:  # 3600 seconds = 1 hour
+                                obj = getObject(dev.linked_object)
 
-                        # result.append(card)
-                
+                                card = {
+                                    '_type': 'card',
+                                    'tid': dev.linked_object,
+                                    'name': obj.description,
+                                }
+                                img = getProperty(dev.linked_object + ".image")
+                                if img is None:
+                                    continue
+                                path_image = "/opt/osyshome" + img
+                                if os.path.isfile(path_image):
+                                    with open(path_image, "rb") as image_file:
+                                        card['face'] = base64.b64encode(image_file.read()).decode('utf-8')
+
+                                result.append(card)
+                        except Exception as ex:
+                            _instance.logger.exception(ex)
+                # Update last execution time
+                cache.set("gps_ls_" + data["tid"], current_time, timeout=0)
+
         return result, 200

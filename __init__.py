@@ -2,7 +2,7 @@ from flask import render_template, request, jsonify
 import datetime
 from app.core.main.BasePlugin import BasePlugin
 from app.api import api
-from app.database import session_scope
+from app.database import session_scope, get_now_to_utc
 from app.core.lib.object import updatePropertyThread
 from plugins.GpsTracker.utils import calculate_distance, in_location
 from plugins.GpsTracker.models.GpsDevice import GpsDevice
@@ -94,7 +94,7 @@ class GpsTracker(BasePlugin):
 
             device_rec.lat = lat
             device_rec.lon = lon
-            device_rec.updated = added if added else datetime.datetime.now()
+            device_rec.updated = added if added else get_now_to_utc()
 
             home_location = session.query(GpsLocation).where(GpsLocation.is_home).one_or_none()
             distance = None
@@ -105,7 +105,7 @@ class GpsTracker(BasePlugin):
                     is_home = 1
 
             gps_position = GpsPosition(
-                added=added if added else datetime.datetime.now(),
+                added=added if added else get_now_to_utc(),
                 device_id=device_rec.id,
                 lat=lat,
                 lon=lon,

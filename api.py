@@ -4,7 +4,7 @@ from sqlalchemy import delete, desc
 from app.api.decorators import api_key_required
 from app.authentication.handlers import handle_user_required
 from app.api.models import model_404, model_result
-from app.database import row2dict, session_scope
+from app.database import row2dict, session_scope, convert_local_to_utc, convert_utc_to_local
 from app.core.lib.object import getProperty, getObject
 from plugins.GpsTracker import GpsTracker
 from plugins.GpsTracker.models.GpsDevice import GpsDevice
@@ -307,7 +307,7 @@ class OwnTracks(Resource):
                 battery=data["batt"],
                 charging=data["bs"] == 2,
                 provider='owntracks',
-                added=datetime.datetime.fromtimestamp(data["tst"])
+                added=convert_local_to_utc(datetime.datetime.fromtimestamp(data["tst"]))
             )
             current_time = time.time()
             last_execution = cache.get("gps_ls_" + data["tid"])
@@ -319,13 +319,6 @@ class OwnTracks(Resource):
                     GpsDevice.linked_object.isnot(None)
                 ).all()
                 for dev in devs:
-                    location = {
-                        "_type":"location",
-                        "tid":dev.linked_object,
-                        "lat":dev.lat,
-                        "lon":dev.lon,
-                        "tst":int(dev.updated.timestamp())
-                    }
                     last_location = session.query(GpsPosition).filter(GpsPosition.device_id == dev.id).order_by(desc(GpsPosition.added)).first()
 
                     if last_location:
@@ -339,7 +332,7 @@ class OwnTracks(Resource):
                             "bs": "2" if last_location.charging else "1",
                             "vel":last_location.speed,
                             "acc":last_location.accuracy,
-                            "tst":int(last_location.added.timestamp())
+                            "tst":int(convert_utc_to_local(last_location.added).timestamp())
                         }
 
                         result.append(location)

@@ -139,3 +139,10 @@ class GpsTracker(BasePlugin):
                 updatePropertyThread(device_rec.linked_object + ".isCharging", charging, source=self.name)
 
             return gps_position
+
+    def changeObject(self, event, object_name, property_name, method_name, new_value):
+        with session_scope() as session:
+            devices = session.query(GpsDevice).filter(GpsDevice.linked_object == object_name).all()
+            for device in devices:
+                device.linked_object = new_value
+            session.commit()

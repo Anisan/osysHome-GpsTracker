@@ -176,7 +176,7 @@ class GetLogs(Resource):
 
             # Пагинация
             total = query.count()  # Общее количество записей
-            query = query.order_by(desc(GpsPosition.added))
+            query = query.order_by(GpsPosition.added)
             if per_page and page:
                 logs = query.offset((page - 1) * per_page).limit(per_page).all()
             else:
@@ -210,7 +210,7 @@ gps_position_model = _api_ns.model('GpsPosition', {
 })
 
 @_api_ns.route("/position", methods=['GET','POST'])
-@_api_ns.route("/position/<position_id>", methods=['DELETE'])
+@_api_ns.route("/position/<position_id>", methods=['PUT','DELETE'])
 class GpsPositionResource(Resource):
     get_parser = reqparse.RequestParser()
     get_parser.add_argument('device', type=str, required=True, location='args')
@@ -267,6 +267,24 @@ class GpsPositionResource(Resource):
         )
 
         return {'success': True}, 201
+
+    @api_key_required
+    @handle_user_required
+    def put(self,position_id:int):
+        """ Delete position """
+        with session_scope() as session:
+            pos = session.query(GpsPosition).where(GpsPosition.id == int(position_id)).one_or_none()
+            if pos:
+                data = request.get_json()
+                if 'lat' in data:
+                    pos.lat = data['lat']
+                if 'lng' in data:
+                    pos.lon = data['lng']
+                elif 'lon' in data:
+                    pos.lon = data['lon']
+                session.commit()
+                return {"success": True}, 200
+            return {"success": False}, 404
 
     @api_key_required
     @handle_user_required

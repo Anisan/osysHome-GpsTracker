@@ -323,7 +323,7 @@
             },
             fetchPositions(){
                 loading = "positions"
-                axios.get(`/api/GpsTracker/log?per_page=50`)
+                axios.get(`/api/GpsTracker/log?per_page=50&order_desc=true`)
                     .then(response => {
                         this.positions = response.data.result
                         loading = ""

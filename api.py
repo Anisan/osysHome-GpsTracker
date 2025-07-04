@@ -142,6 +142,7 @@ _parser.add_argument('end_time', type=str, help='End time for filtering logs in 
 _parser.add_argument('device_id', type=str, help='Device ID to filter logs')
 _parser.add_argument('page', type=int, default=1, help='Page number for pagination (default is 1)')
 _parser.add_argument('per_page', type=int, help='Number of items per page (default is 10)')
+_parser.add_argument('order_desc', type=bool, help='Whether to order results in descending order')
 
 
 @_api_ns.route("/log", endpoint="gpstracker_logs")
@@ -153,7 +154,8 @@ class GetLogs(Resource):
         'end_time': 'End time for filtering logs in ISO format',
         'device_id': 'Device ID to filter logs',
         'page': 'Page number for pagination',
-        'per_page': 'Number of items per page'
+        'per_page': 'Number of items per page',
+        'order_desc': 'Whether to order results in descending order',
     })
     def get(self):
         args = _parser.parse_args()
@@ -176,7 +178,12 @@ class GetLogs(Resource):
 
             # Пагинация
             total = query.count()  # Общее количество записей
-            query = query.order_by(GpsPosition.added)
+
+            order_desc = args.get('order_desc', False)
+            if order_desc:
+                query = query.order_by(desc(GpsPosition.added))
+            else:
+                query = query.order_by(GpsPosition.added)
             if per_page and page:
                 logs = query.offset((page - 1) * per_page).limit(per_page).all()
             else:

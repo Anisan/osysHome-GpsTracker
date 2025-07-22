@@ -1,6 +1,6 @@
 {% extends "layouts/module_admin.html" %}
 {% block breadcrumb %}
-<li class="breadcrumb-item"><a href="GpsTracker">GpsTracker</a></li>
+<li class="breadcrumb-item"><a href="GpsTracker">{{ _('GpsTracker')}}</a></li>
 {% endblock %}
 {% block module %}
 
@@ -14,28 +14,28 @@
     </div>
 
     <ul class="nav nav-tabs mb-3" id="configTabs" role="tablist">
-        <li class="nav-item"><a class="nav-link tab-button active" href="#devices" data-bs-toggle="tab" role="tab">Devices</a></li>
-        <li class="nav-item"><a class="nav-link tab-button" href="#locations" data-bs-toggle="tab" role="tab">Location</a></li>
-        <li class="nav-item"><a class="nav-link tab-button" href="#positions" data-bs-toggle="tab" role="tab">Log</a></li>
-        <li class="nav-item"><a class="nav-link tab-button" href="#tab_map" data-bs-toggle="tab" role="tab">View</a></li>
+        <li class="nav-item"><a class="nav-link tab-button active" href="#devices" data-bs-toggle="tab" role="tab">{{ _('Devices')}}</a></li>
+        <li class="nav-item"><a class="nav-link tab-button" href="#locations" data-bs-toggle="tab" role="tab">{{ _('Location')}}</a></li>
+        <li class="nav-item"><a class="nav-link tab-button" href="#positions" data-bs-toggle="tab" role="tab">{{ _('Log')}}</a></li>
+        <li class="nav-item"><a class="nav-link tab-button" href="#tab_map" data-bs-toggle="tab" role="tab">{{ _('Map')}}</a></li>
     </ul>
     <div class="tab-content" id="myTabContent">
         <div class="tab-pane fade show active" id="devices" role="tabpanel" aria-labelledby="general-tab">
             <btn class="btn btn-primary btn-sm" role="button" @click="fetchDevices()">
                 <span v-if="loading == 'devices'" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                 <i v-else class="fas fa-rotate me-2"></i>
-                Refresh
+                {{ _('Refresh')}}
             </btn>
             <div class="table-responsive">
                 <table class="table table-hover table-striped">
                     <thead>
                         <tr>
-                            <th>Title</th>
+                            <th>{{ _('Title')}}</th>
                             <th>ID</th>
-                            <th>Lat</th>
-                            <th>Lon</th>
-                            <th>Linked object</th>
-                            <th>Updated</th>
+                            <th>{{ _('Lat')}}</th>
+                            <th>{{ _('Lon')}}</th>
+                            <th>{{ _('Linked object')}}</th>
+                            <th>{{ _('Updated')}}</th>
                             <th>&nbsp;</th>
                         </tr>
                     </thead>
@@ -48,8 +48,8 @@
                             <td>[[ item.linked_object ]]</td>
                             <td>[[ item.updated ]]</td>
                             <td>
-                                <a class="btn btn-success ms-2 ms-auto btn-sm" @click="editDevice(item)" title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                                <a class="btn btn-danger ms-2 ms-auto btn-sm" @click="delDevice(item.id)" title="Delete"><i class="fas fa-trash"></i></a>
+                                <a class="btn btn-success ms-2 ms-auto btn-sm" @click="editDevice(item)" title="{{ _('Edit')}}"><i class="fas fa-pencil-alt"></i></a>
+                                <a class="btn btn-danger ms-2 ms-auto btn-sm" @click="delDevice(item.id)" title="{{ _('Delete')}}"><i class="fas fa-trash"></i></a>
                             </td>
                         </tr>
                     </tbody>
@@ -60,18 +60,18 @@
             <btn class="btn btn-primary btn-sm" role="button" @click="fetchLocation()">
                 <span v-if="loading == 'locations'" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                 <i v-else class="fas fa-rotate me-2"></i>
-                Refresh
+                {{ _('Refresh')}}
             </btn>
-            <btn class="btn btn-success ms-2 btn-sm" @click="addLocation()" title="Add"><i class="fas fa-pencil-alt"></i>Add</btn>
+            <btn class="btn btn-success ms-2 btn-sm" @click="addLocation()" title="{{ _('Add')}}"><i class="fas fa-pencil-alt"></i>{{ _('Add')}}</btn>
             <div class="table-responsive">
                 <table class="table table-hover table-striped">
                     <thead>
                         <tr>
-                            <th>Title</th>
-                            <th>Lat</th>
-                            <th>Lon</th>
-                            <th>Range</th>
-                            <th>Home</th>
+                            <th>{{ _('Title')}}</th>
+                            <th>{{ _('Lat')}}</th>
+                            <th>{{ _('Lon')}}</th>
+                            <th>{{ _('Range')}}</th>
+                            <th>{{ _('Home')}}</th>
                             <th>&nbsp;</th>
                         </tr>
                     </thead>
@@ -83,8 +83,8 @@
                             <td>[[ item.range ]]</td>
                             <td>[[ item.is_home ]]</td>
                             <td>
-                                <a class="btn btn-success ms-2 ms-auto btn-sm" @click="editLocation(item)" title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                                <a class="btn btn-danger ms-2 ms-auto btn-sm" @click="delLocation(item.id)" title="Delete"><i class="fas fa-trash"></i></a>
+                                <a class="btn btn-success ms-2 ms-auto btn-sm" @click="editLocation(item)" title="{{ _('Edit')}}"><i class="fas fa-pencil-alt"></i></a>
+                                <a class="btn btn-danger ms-2 ms-auto btn-sm" @click="delLocation(item.id)" title="{{ _('Delete')}}"><i class="fas fa-trash"></i></a>
                             </td>
                         </tr>
                     </tbody>
@@ -95,22 +95,22 @@
             <btn class="btn btn-primary btn-sm" role="button" @click="fetchPositions()">
                 <span v-if="loading == 'positions'" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                 <i v-else class="fas fa-rotate me-2"></i>
-                Refresh
+                {{ _('Refresh')}}
             </btn>
             <div class="table-responsive">
                 <table class="table table-hover table-striped">
                     <thead>
                         <tr>
-                            <th>Device</th>
-                            <th>Added</th>
-                            <th>Lat</th>
-                            <th>Lon</th>
-                            <th>Alt</th>
-                            <th>Accuracy</th>
-                            <th>Speed</th>
-                            <th>Battery</th>
-                            <th>Provider</th>
-                            <th>Location</th>
+                            <th>{{ _('Device')}}</th>
+                            <th>{{ _('Added')}}</th>
+                            <th>{{ _('Lat')}}</th>
+                            <th>{{ _('Lon')}}</th>
+                            <th>{{ _('Alt')}}</th>
+                            <th>{{ _('Accuracy')}}</th>
+                            <th>{{ _('Speed')}}</th>
+                            <th>{{ _('Battery')}}</th>
+                            <th>{{ _('Provider')}}</th>
+                            <th>{{ _('Location')}}</th>
                             <th>&nbsp;</th>
                         </tr>
                     </thead>
@@ -128,10 +128,10 @@
                             <td>[[ item.provider ]]</td>
                             <td>
                                 <a v-if="item.address" :href="'https://static-maps.yandex.ru/1.x/?ll='+item.lon+','+item.lat+'&size=650,450&z=17&l=map&pt='+item.lon+','+item.lat+',pm2blm'" target="_blank">[[ item.address ]]</a>
-                                <a v-else :href="'https://static-maps.yandex.ru/1.x/?ll='+item.lon+','+item.lat+'&size=650,450&z=17&l=map&pt='+item.lon+','+item.lat+',pm2blm'" target="_blank">Unknown position</a>
+                                <a v-else :href="'https://static-maps.yandex.ru/1.x/?ll='+item.lon+','+item.lat+'&size=650,450&z=17&l=map&pt='+item.lon+','+item.lat+',pm2blm'" target="_blank">{{ _('Unknown position')}}</a>
                             </td>
                             <td>
-                                <a class="btn btn-danger ms-2 ms-auto btn-sm" @click="delPosition(item)" title="Delete"><i class="fas fa-trash"></i></a>
+                                <a class="btn btn-danger ms-2 ms-auto btn-sm" @click="delPosition(item)" title="{{ _('Delete')}}"><i class="fas fa-trash"></i></a>
                             </td>
                         </tr>
                     </tbody>
@@ -162,24 +162,24 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="exampleModalLabel">Device</h5>
+                    <h5 class="modal-title" id="exampleModalLabel">{{ _('Device')}}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div v-if="edit_device" class="modal-body">
                     <div>
-                        <label class="form-label">Title</label>
+                        <label class="form-label">{{ _('Title')}}</label>
                         <input class="form-control" v-model="edit_device.title">
                     </div>
                     <div>
                         <label class="form-check-label" for="flexCheckDefault">
-                            Linked object
+                            {{ _('Linked object')}}
                         </label>
                         <select-with-filter placeholder="Select object" :options="objectOptions" v-model="edit_device.linked_object"></select-with-filter>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-success" data-bs-dismiss="modal" @click="updateDevice()">Save</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success" data-bs-dismiss="modal" @click="updateDevice()">{{ _('Save')}}</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Close')}}</button>
                 </div>
             </div>
         </div>
@@ -189,34 +189,34 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="exampleModalLabel">Device</h5>
+                <h5 class="modal-title" id="exampleModalLabel">{{ _('Device')}}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div v-if="edit_location" class="modal-body">
                 <div>
-                    <label class="form-label">Title</label>
+                    <label class="form-label">{{ _('Title')}}</label>
                     <input class="form-control" v-model="edit_location.title">
                 </div>
                 <div>
-                    <label class="form-label">Lat</label>
+                    <label class="form-label">{{ _('Lat')}}</label>
                     <input class="form-control" v-model="edit_location.lat">
                 </div>
                 <div>
-                    <label class="form-label">Lon</label>
+                    <label class="form-label">{{ _('Lon')}}</label>
                     <input class="form-control" v-model="edit_location.lon">
                 </div>
                 <div>
-                    <label class="form-label">Range</label>
+                    <label class="form-label">{{ _('Range')}}</label>
                     <input class="form-control" v-model="edit_location.range">
                 </div>
                 <div class="mt-2">
-                    <label class="form-label">Home</label>
+                    <label class="form-label">{{ _('Home')}}</label>
                     <input type="checkbox" class="form-check-control" v-model="edit_location.is_home">
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-success" data-bs-dismiss="modal" @click="updateLocation()">Save</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal" @click="updateLocation()">{{ _('Save')}}</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Close')}}</button>
             </div>
         </div>
     </div>

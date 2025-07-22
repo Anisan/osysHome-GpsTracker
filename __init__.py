@@ -13,7 +13,7 @@ class GpsTracker(BasePlugin):
 
     def __init__(self,app):
         super().__init__(app,__name__)
-        self.title = "GPS tracker"
+        self.title = "GpsTracker"
         self.description = """GPS tracker"""
         self.category = "App"
         self.version = "0.1"

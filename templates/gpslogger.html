@@ -235,7 +235,7 @@
                     </thead>
                     <tbody>
                         <tr v-for="(item,index) in positions" :key="'pos_'+index">
-                            <td v-if="item.device_id in devices">[[ devices[item.device_id].title ]]</td>
+                            <td v-if="item.device_id in devices_dict">[[ devices_dict[item.device_id] ]]</td>
                             <td v-else>[[item.device_id]]</td>
                             <td>[[ item.added ]]</td>
                             <td>[[ item.lat ]]</td>
@@ -383,6 +383,7 @@
             provider: { id: 1, title: "OpenStreetMap", url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", subdomains: ['a','b','c'] },
             loading: "",
             devices: [],
+            devices_dict:{},
             locations: [],
             positions:[],
             message: '',
@@ -488,6 +489,11 @@
                     .then(response => {
                         devs = response.data.result
                         this.devices = devs
+                        tmp = {}
+                        devs.forEach(element => {
+                            tmp[element.id] = element.title
+                        });
+                        this.devices_dict = tmp
                         loading = ""
                         this.message = ''
                         console.log(this.devices)

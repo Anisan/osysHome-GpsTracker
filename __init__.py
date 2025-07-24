@@ -103,6 +103,14 @@ class GpsTracker(BasePlugin):
                 distance = calculate_distance(lat, lon, home_location.lat, home_location.lon)
                 if distance < home_location.range:
                     is_home = 1
+                
+            current_location = None
+            locations = session.query(GpsLocation).all()
+            for location in locations:
+                if in_location(lat,lon, location.lat, location.lon, location.range):
+                    current_location = location.title
+                    address = location.title
+                    break
 
             gps_position = GpsPosition(
                 added=added if added else get_now_to_utc(),
@@ -119,13 +127,6 @@ class GpsTracker(BasePlugin):
             )
             session.add(gps_position)
             session.commit()
-
-            current_location = None
-            locations = session.query(GpsLocation).all()
-            for location in locations:
-                if in_location(lat,lon, location.lat, location.lon, location.range):
-                    current_location = location.title
-                    break
 
             if device_rec.linked_object:
                 updatePropertyThread(device_rec.linked_object + ".latlon", f'{lat},{lon}', source=self.name)

@@ -267,6 +267,13 @@
                     layer-type="base"
                     name="OpenStreetMap">
                     </l-tile-layer>
+                    <l-control class="ma-2">
+                        <btn class="btn btn-primary btn-sm" role="button" @click="fetchDataForMap()">
+                            <span v-if="loading == 'devices'" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <i v-else class="fas fa-rotate me-2"></i>
+                            {{ _('Refresh')}}
+                        </btn>
+                    </l-control>
                     <l-circle 
                         v-for="location in locations" 
                         :key="'loc_'+location.id" 
@@ -278,6 +285,10 @@
                         :fillOpacity="0.2">
                         <l-tooltip :content="location.title" />
                     </l-circle>
+                    <l-layer-group v-for="device in devices" :key="device.id" layer-type="overlay"
+                        :name="'Layer '+device.title">
+                        <l-polyline :key="'polyline_'+device.id" :lat-lngs="getPolyline(device.id)" :color="device.color" />
+                    </l-layer-group>
                     <l-marker v-for="marker in devices" :key="'mu_'+marker.id" ref="markersRef" :lat-lng="[marker.lat, marker.lon]" :icon="customIcon(marker)">
                         <l-tooltip :options="{ permanent: false, direction: 'top' }">
                             <div class="marker-tooltip">
@@ -364,7 +375,7 @@
 
 
 <script>
-    var { LMap, LTileLayer, LMarker, LCircle, LTooltip, LPopup, LIcon } = Vue2Leaflet;
+    var { LMap, LTileLayer, LMarker, LCircle, LTooltip, LPopup, LIcon, LControl, LPolyline} = Vue2Leaflet;
     new Vue({
         el: '#gps_tracker',
         delimiters: ['[[', ']]'], // Измененные разделители
@@ -391,7 +402,7 @@
             edit_location: null,
             objects:{}
         },
-        components: { LMap, LTileLayer, LMarker, LCircle, LTooltip, LPopup, LIcon},
+        components: { LMap, LTileLayer, LMarker, LCircle, LTooltip, LPopup, LIcon, LControl, LPolyline},
         async created() {
             await this.fetchObjects()
             await this.fetchDevices()
@@ -472,6 +483,10 @@
                 popupAnchor: [0, -56]
                 });
             },
+            async fetchDataForMap(){
+                await this.fetchDevices()
+                await this.fetchPositions()
+            },
             fetchObjects(){
                 axios.get(`/api/object/list/details`)
                     .then(response => {
@@ -482,6 +497,27 @@
                         console.log(error)
                         this.message = 'Error fetching: ' + error;
                     });
+            },
+            dateFormat(dt){
+                const today = dt
+                let date =
+                    today.getFullYear()+
+                    "-" +
+                    (today.getMonth() + 1 < 10 ? "0" : "") +
+                    (today.getMonth() + 1) +
+                    "-" +
+                    (today.getDate() < 10 ? "0" : "") +
+                    today.getDate();
+                let time =
+                    (today.getHours() < 10 ? "0" : "") +
+                    today.getHours() +
+                    ":" +
+                    (today.getMinutes() < 10 ? "0" : "") +
+                    today.getMinutes() +
+                    ":" +
+                    (today.getSeconds() < 10 ? "0" : "") +
+                    today.getSeconds();
+                return date+" "+time;
             },
             fetchDevices(){
                 loading = "devices"
@@ -521,7 +557,15 @@
             },
             fetchPositions(){
                 loading = "positions"
-                axios.get(`/api/GpsTracker/log?per_page=50&order_desc=true`)
+                let urlMethod = "/api/GpsTracker/log?&order_desc=true"
+                var now = new Date()
+                var date = new Date()
+                date.setHours(0, 0, 0, 0);
+                var to = this.dateFormat(now)
+                var from = this.dateFormat(date)
+                urlMethod += "&start_time=" + from + "&end_time=" + to
+
+                axios.get(urlMethod)
                     .then(response => {
                         this.positions = response.data.result
                         loading = ""
@@ -532,6 +576,11 @@
                         this.message = 'Error fetching: ' + error;
                         loading = ""
                     });
+            },
+            getPolyline(id){
+                return this.positions
+                    .filter(item => item.device_id === id)
+                    .map(item => [item.lat, item.lon]);
             },
             delDevice(id) {
                 axios.delete(`/api/GpsTracker/device/${id}`)

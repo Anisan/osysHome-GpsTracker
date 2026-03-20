@@ -103,7 +103,7 @@ class GpsTracker(BasePlugin):
                 distance = calculate_distance(lat, lon, home_location.lat, home_location.lon)
                 if distance < home_location.range:
                     is_home = 1
-                
+
             current_location = None
             locations = session.query(GpsLocation).all()
             for location in locations:

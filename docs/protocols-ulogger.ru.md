@@ -54,7 +54,9 @@ curl -X POST "http://your-server/api/GpsTracker/position?apikey=YOUR_API_KEY" \
 ```
 
 Ожидаемый ответ:
-`{"error": false}`
+`{"success": true}`
+
+HTTP-код: `201 Created`.
 
 ## Проверка результата
 После приёма:

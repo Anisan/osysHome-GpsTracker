@@ -42,7 +42,7 @@ curl -X POST "http://your-server/api/GpsTracker/position?apikey=YOUR_API_KEY" \
 1. Для каждого человека создайте объект и свойства как в сценарии 1.
 2. В `GpsTracker -> Devices` привяжите каждый `Device` к соответствующему объекту (`Linked object`).
 3. Создайте API key и настройте OwnTracks на отправку на:
-   - `http://YOUR_OSYS_HOME/GpsTracker/owntracks?apikey=YOURKEY`
+   - `http://YOUR_OSYS_HOME/api/GpsTracker/owntracks?apikey=YOURKEY`
 4. OwnTracks будет присылать JSON location.
 
 Пример тела location (как в разделе `protocols-owntracks.ru.md`):

@@ -1,6 +1,6 @@
-# Протокол OwnTracks (endpoint `/GpsTracker/owntracks`)
+# Протокол OwnTracks (endpoint `/api/GpsTracker/owntracks`)
 
-`GpsTracker` умеет принимать события OwnTracks через `POST /GpsTracker/owntracks`.
+`GpsTracker` умеет принимать события OwnTracks через `POST /api/GpsTracker/owntracks`.
 
 Эндпоинт поддерживает **входящие location** и дополнительно умеет отвечать “друзьям” (другим трекерам), чтобы OwnTracks могли обмениваться статусами.
 
@@ -29,7 +29,7 @@ API key можно передать одним из способов:
 
 ## Пример (curl) — OwnTracks location
 ```bash
-curl -X POST "http://your-server/GpsTracker/owntracks?apikey=YOURKEY" \
+curl -X POST "http://your-server/api/GpsTracker/owntracks?apikey=YOURKEY" \
   -H "Content-Type: application/json" \
   -d '{
     "_type": "location",

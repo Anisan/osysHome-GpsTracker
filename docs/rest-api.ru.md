@@ -25,7 +25,7 @@ API key передаётся:
 - `GET /api/GpsTracker/device/<device_id>` — получение устройства
 - `POST /api/GpsTracker/device/<device_id>` — создать/обновить
   - тело: JSON с полями:
-    - `id` (если передан — используется для обновления)
+    - `id` (обязателен в текущей реализации)
     - `title`
     - `linked_object`
 - `DELETE /api/GpsTracker/device/<device_id>` — удалить устройство и его историю

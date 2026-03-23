@@ -22,7 +22,7 @@
      - одну запись с флагом **Is home** (это будет «дом»)
      - при желании — дополнительные геозоны (работают как “location”)
 4. Подключите ваше приложение через API key:
-   - отправляйте координаты через **OwnTracks** на `POST /GpsTracker/owntracks?apikey=YOUR_API_KEY`
+  - отправляйте координаты через **OwnTracks** на `POST /api/GpsTracker/owntracks?apikey=YOUR_API_KEY`
    - или напрямую через REST: `POST /api/GpsTracker/position?apikey=YOUR_API_KEY`
 5. Отправьте 1 тестовое сообщение и проверьте:
    - список устройств и карту

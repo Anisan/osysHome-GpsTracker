@@ -2,7 +2,7 @@
 
 Ниже — несколько “рабочих” сценариев, которые помогают понять, как именно связать GpsTracker с вашими устройствами.
 
-## Сценарий 1 (для новичка): телефон через uLogger
+## Сценарий 1 (для новичка): телефон через API key
 Цель: чтобы osysHome получал координаты и обновлял свойства объекта.
 
 1. В `Admin -> Objects` создайте объект, например: `JohnPhone`.
@@ -15,17 +15,23 @@
    - `Location -> Add`:
      - сделайте одну запись с `Is home = true` (это “дом”)
      - добавьте дополнительные геозоны при необходимости
-4. Настройте uLogger:
-   - endpoint: `http://YOUR_OSYS_HOME/GpsTracker/client/index.php`
-   - user (строка): например `john`
-5. Проверьте отправку (curl-логика):
+4. Создайте API key (см. `index.ru.md`, раздел "Как создать API key").
+5. Проверьте отправку (без авторизации и cookie):
 
 ```bash
-curl -c cookies.txt -X POST "http://your-server/GpsTracker/client/index.php" \
-  -d "action=auth&user=john"
-
-curl -b cookies.txt -X POST "http://your-server/GpsTracker/client/index.php" \
-  -d "action=addpos&lat=55.751244&lon=37.618423&time=1710000000&accuracy=30&provider=gps&comment=Yandex%20Address&battlevel=80&charging=false"
+curl -X POST "http://your-server/api/GpsTracker/position?apikey=YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device": "john_phone",
+    "lat": 55.751244,
+    "lon": 37.618423,
+    "added": "2026-03-23T10:15:00",
+    "accuracy": 30,
+    "provider": "gps",
+    "address": "Yandex Address",
+    "battery": 80,
+    "charging": false
+  }'
 ```
 
 Результат:
@@ -35,7 +41,7 @@ curl -b cookies.txt -X POST "http://your-server/GpsTracker/client/index.php" \
 ## Сценарий 2 (для новичка): OwnTracks для “нескольких людей”
 1. Для каждого человека создайте объект и свойства как в сценарии 1.
 2. В `GpsTracker -> Devices` привяжите каждый `Device` к соответствующему объекту (`Linked object`).
-3. Настройте OwnTracks на отправку на:
+3. Создайте API key и настройте OwnTracks на отправку на:
    - `http://YOUR_OSYS_HOME/GpsTracker/owntracks?apikey=YOURKEY`
 4. OwnTracks будет присылать JSON location.
 
@@ -79,6 +85,11 @@ curl -X POST "http://your-server/api/GpsTracker/position?apikey=YOURKEY" \
     "address": "Test",
     "added": "2026-03-20T12:34:56"
   }'
+```
+
+Альтернатива: отправка через `GET` (параметры в query-string):
+```bash
+curl -G "http://your-server/api/GpsTracker/position?apikey=YOURKEY&device=john_ulogger&lat=55.751244&lon=37.618423&accuracy=30&provider=manual&address=Test"
 ```
 
 Примечание:

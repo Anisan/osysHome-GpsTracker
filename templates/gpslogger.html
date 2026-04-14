@@ -3,6 +3,7 @@
 <li class="breadcrumb-item"><a href="GpsTracker">{{ _('GpsTracker')}}</a></li>
 {% endblock %}
 {% block module %}
+{% set settings_provider = (form.address_provider.data if form and form.address_provider.data else 'disabled') %}
 
 <script src="{{ config.ASSETS_ROOT }}/plugins/vue/vue@2.js"></script>
 <script src="{{ config.ASSETS_ROOT }}/plugins/vue/axios.min.js"></script>
@@ -10,7 +11,6 @@
 <script src="//unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="//unpkg.com/vue2-leaflet"></script>
             
-
   <style>
   #gps_tracker {
     height: calc(100vh - 150px);
@@ -122,7 +122,7 @@
 }
   </style>
 
-<div id="gps_tracker">
+<div id="gps_tracker" v-cloak>
 
     <div v-if="message" class="alert alert-warning mt-3">
         <p>[[ message ]]</p>
@@ -133,6 +133,7 @@
         <li class="nav-item"><a class="nav-link tab-button" href="#locations" data-bs-toggle="tab" role="tab">{{ _('Location')}}</a></li>
         <li class="nav-item"><a class="nav-link tab-button" href="#positions" data-bs-toggle="tab" role="tab">{{ _('Log')}}</a></li>
         <li class="nav-item"><a class="nav-link tab-button" id="map-tab-button" href="#tab_map" data-bs-toggle="tab" data-bs-target="#tab_map" role="tab">{{ _('Map')}}</a></li>
+        <li class="nav-item"><a class="nav-link tab-button" href="#settings" data-bs-toggle="tab" role="tab">{{ _('Settings')}}</a></li>
     </ul>
     <div class="tab-content" id="myTabContent">
         <div class="tab-pane fade show active" id="devices" role="tabpanel" aria-labelledby="general-tab">
@@ -303,6 +304,42 @@
                 </l-map>
             </div>
         </div>
+        <div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="general-tab">
+            {% if form %}
+            <div class="card mb-2">
+              <div class="card-body">
+                <form method="post">
+                  {{ form.hidden_tag() }}
+
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label">{{ _('Address provider') }}</label>
+                      {{ form.address_provider(class="form-select", id="address_provider_select", **{"v-model":"settingsAddressProvider"}) }}
+                    </div>
+                    <div class="col-md-6 mb-3" v-show="settingsAddressProvider === 'google'">
+                      <label class="form-label">{{ _('Google API key') }}</label>
+                      {{ form.google_api_key(class="form-control", placeholder="AIza...") }}
+                    </div>
+                    <div class="col-md-6 mb-3" v-show="settingsAddressProvider === 'yandex'">
+                      <label class="form-label">{{ _('Yandex API key') }}</label>
+                      {{ form.yandex_api_key(class="form-control", placeholder="Yandex API key") }}
+                    </div>
+                    <div class="col-md-6 mb-3" v-show="settingsAddressProvider === 'locationiq'">
+                      <label class="form-label">{{ _('LocationIQ API key') }}</label>
+                      {{ form.locationiq_api_key(class="form-control", placeholder="LocationIQ API key") }}
+                    </div>
+                    <div class="col-md-6 mb-3" v-show="settingsAddressProvider === 'mapsco'">
+                      <label class="form-label">{{ _('maps.co API key') }}</label>
+                      {{ form.mapsco_api_key(class="form-control", placeholder="maps.co API key (optional)") }}
+                    </div>
+                  </div>
+
+                  <button type="submit" class="btn btn-primary">{{ _('Save') }}</button>
+                </form>
+              </div>
+            </div>
+            {% endif %}
+        </div>
     </div>
 
     <!-- Модальное окно -->
@@ -400,7 +437,8 @@
             message: '',
             edit_device: null,
             edit_location: null,
-            objects:{}
+            objects:{},
+            settingsAddressProvider: '{{ settings_provider|lower }}'
         },
         components: { LMap, LTileLayer, LMarker, LCircle, LTooltip, LPopup, LIcon, LControl, LPolyline},
         async created() {

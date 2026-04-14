@@ -1,13 +1,15 @@
-from flask import render_template, request, jsonify
+from flask import render_template, request, jsonify, redirect
 import datetime
 from app.core.main.BasePlugin import BasePlugin
 from app.api import api
 from app.database import session_scope, get_now_to_utc
 from app.core.lib.object import updatePropertyThread
 from plugins.GpsTracker.utils import calculate_distance, in_location
+from plugins.GpsTracker.geocoding_providers import resolve_address, is_provider_disabled
 from plugins.GpsTracker.models.GpsDevice import GpsDevice
 from plugins.GpsTracker.models.GpsLocation import GpsLocation
 from plugins.GpsTracker.models.GpsPosition import GpsPosition
+from plugins.GpsTracker.forms.SettingForms import SettingsForm
 
 class GpsTracker(BasePlugin):
 
@@ -27,7 +29,25 @@ class GpsTracker(BasePlugin):
         pass
 
     def admin(self, request):
-        return render_template('gpslogger.html')
+        settings = SettingsForm()
+
+        if request.method == "GET":
+            settings.address_provider.data = self.config.get("address_provider", "disabled")
+            settings.google_api_key.data = self.config.get("google_api_key", "")
+            settings.yandex_api_key.data = self.config.get("yandex_api_key", "")
+            settings.locationiq_api_key.data = self.config.get("locationiq_api_key", "")
+            settings.mapsco_api_key.data = self.config.get("mapsco_api_key", "")
+        else:
+            if settings.validate_on_submit():
+                self.config["address_provider"] = settings.address_provider.data or "disabled"
+                self.config["google_api_key"] = (settings.google_api_key.data or "").strip()
+                self.config["yandex_api_key"] = (settings.yandex_api_key.data or "").strip()
+                self.config["locationiq_api_key"] = (settings.locationiq_api_key.data or "").strip()
+                self.config["mapsco_api_key"] = (settings.mapsco_api_key.data or "").strip()
+                self.saveConfig()
+                return redirect("GpsTracker")
+
+        return self.render("gpslogger.html", {"form": settings})
 
     def route_index(self):
         '''Support ulogger'''
@@ -66,7 +86,7 @@ class GpsTracker(BasePlugin):
                 # bearing = request.form.get('bearing')
                 accuracy = castFloat(request.form.get('accuracy'))
                 provider = request.form.get('provider')
-                comment = request.form.get('comment')
+                # comment = request.form.get('comment')
                 # image_meta = request.form.get('image')
                 # track_id = request.form.get('trackid')
                 battlevel = request.form.get('battlevel')
@@ -77,7 +97,19 @@ class GpsTracker(BasePlugin):
 
                 added = datetime.datetime.fromtimestamp(timestamp)
 
-                self.addGpsPosition(device,lat,lon,altitude,accuracy,speed,battlevel,charging,provider,comment,added)
+                self.addGpsPosition(
+                    device=device,
+                    lat=lat,
+                    lon=lon,
+                    alt=altitude,
+                    accuracy=accuracy,
+                    speed=speed,
+                    battery=battlevel,
+                    charging=charging,
+                    provider=provider,
+                    address=None,
+                    added=added,
+                )
                 response = {"error": False}
                 return jsonify(response), 200
 
@@ -109,8 +141,23 @@ class GpsTracker(BasePlugin):
             for location in locations:
                 if in_location(lat,lon, location.lat, location.lon, location.range):
                     current_location = location.title
-                    address = location.title
                     break
+
+            # If address comes from payload, keep it as-is and skip reverse-geocoding.
+            incoming_address = address.strip() if isinstance(address, str) else address
+            has_incoming_address = incoming_address not in (None, "")
+
+            # Determine address from geofences or reverse-geocoding provider only when
+            # caller didn't provide address explicitly.
+            address_provider = (self.config.get("address_provider") or "disabled").strip().lower()
+            if has_incoming_address:
+                address = incoming_address
+            elif current_location is not None:
+                address = current_location
+            elif is_provider_disabled(address_provider):
+                address = None
+            else:
+                address = resolve_address(self.config, lat, lon, self.logger)
 
             gps_position = GpsPosition(
                 added=added if added else get_now_to_utc(),
@@ -129,12 +176,15 @@ class GpsTracker(BasePlugin):
             session.commit()
 
             if device_rec.linked_object:
+                address_provider = (self.config.get("address_provider") or "disabled").strip().lower()
+                should_push_address = not is_provider_disabled(address_provider)
                 updatePropertyThread(device_rec.linked_object + ".latlon", f'{lat},{lon}', source=self.name)
                 # updatePropertyThread(device_rec.linked_object + ".lon", lon)
                 # updatePropertyThread(device_rec.linked_object + ".alt", alt)
                 updatePropertyThread(device_rec.linked_object + ".location", current_location, source=self.name)
                 updatePropertyThread(device_rec.linked_object + ".home", is_home, source=self.name)
-                updatePropertyThread(device_rec.linked_object + ".address", address, source=self.name)
+                if should_push_address or has_incoming_address:
+                    updatePropertyThread(device_rec.linked_object + ".address", address, source=self.name)
                 updatePropertyThread(device_rec.linked_object + ".home_distance", distance, source=self.name)
                 updatePropertyThread(device_rec.linked_object + ".battery", battery, source=self.name)
                 updatePropertyThread(device_rec.linked_object + ".isCharging", charging, source=self.name)

@@ -1,12 +1,20 @@
 {
   "Alt": "Высота",
+  "Address provider": "Провайдер адреса",
+  "Devices": "Устройства",
+  "Google API key": "Google API ключ",
   "GpsTracker": "GPS-трекер",
   "Is home": "Дом",
   "Lat": "Широта",
+  "Location": "Локации",
+  "LocationIQ API key": "LocationIQ API ключ",
   "Log": "Журнал",
   "Lon": "Долгота",
   "Map": "Карта",
+  "maps.co API key": "maps.co API ключ",
   "Provider": "Провайдер",
   "Range": "Диапазон",
-  "Unknown position": "Неизвестное положение"
+  "Settings": "Настройки",
+  "Unknown position": "Неизвестное положение",
+  "Yandex API key": "Yandex API ключ"
 }

@@ -1,12 +1,20 @@
 {
   "Alt": "Alt",
+  "Address provider": "Address provider",
+  "Devices": "Devices",
+  "Google API key": "Google API key",
   "GpsTracker": "GpsTracker",
   "Is home": "Is home",
   "Lat": "Lat",
+  "Location": "Location",
+  "LocationIQ API key": "LocationIQ API key",
   "Log": "Log",
   "Lon": "Lon",
   "Map": "Map",
+  "maps.co API key": "maps.co API key",
   "Provider": "Provider",
   "Range": "Range",
-  "Unknown position": "Unknown position"
+  "Settings": "Settings",
+  "Unknown position": "Unknown position",
+  "Yandex API key": "Yandex API key"
 }

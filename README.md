@@ -50,6 +50,13 @@ The module provides API endpoints:
 - **Distance Calculation**: Haversine formula for distance
 - **Home Detection**: Automatic home location detection
 
+## Address Detection
+
+Address detection (reverse geocoding) is documented in:
+
+- `docs/address-geocoding.md` (English)
+- `docs/address-geocoding.ru.md` (Russian)
+
 ## Version
 
 Current version: **0.1**

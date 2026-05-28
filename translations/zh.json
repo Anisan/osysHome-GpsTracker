@@ -1,0 +1,17 @@
+{
+  "Address provider": "地址提供商",
+  "Alt": "替代",
+  "Google API key": "谷歌 API 密钥",
+  "GpsTracker": "全球定位追踪器",
+  "Is home": "到家了吗",
+  "Lat": "纬度",
+  "LocationIQ API key": "LocationIQ API 密钥",
+  "Log": "日志",
+  "Lon": "朗",
+  "Map": "地图",
+  "Provider": "提供者",
+  "Range": "范围",
+  "Unknown position": "位置未知",
+  "Yandex API key": "Yandex API 密钥",
+  "maps.co API key": "地图.co API 密钥"
+}

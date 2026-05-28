@@ -1,0 +1,17 @@
+{
+  "Address provider": "Dostawca adresu",
+  "Alt": "Alt",
+  "Google API key": "Klucz API Google",
+  "GpsTracker": "Śledzenie GPS",
+  "Is home": "Jest w domu",
+  "Lat": "łac",
+  "LocationIQ API key": "Klucz API LocationIQ",
+  "Log": "Dziennik",
+  "Lon": "Lon",
+  "Map": "Mapa",
+  "Provider": "Dostawca",
+  "Range": "Zakres",
+  "Unknown position": "Nieznane stanowisko",
+  "Yandex API key": "Klucz API Yandex",
+  "maps.co API key": "Klucz API maps.co"
+}

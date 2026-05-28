@@ -1,0 +1,17 @@
+{
+  "Address provider": "Fornitore di indirizzi",
+  "Alt": "Alt",
+  "Google API key": "Chiave API di Google",
+  "GpsTracker": "GPSTracker",
+  "Is home": "È a casa",
+  "Lat": "lat",
+  "LocationIQ API key": "Chiave API LocationIQ",
+  "Log": "Tronco d'albero",
+  "Lon": "Lon",
+  "Map": "Mappa",
+  "Provider": "Fornitore",
+  "Range": "Allineare",
+  "Unknown position": "Posizione sconosciuta",
+  "Yandex API key": "Chiave API Yandex",
+  "maps.co API key": "Chiave API di maps.co"
+}

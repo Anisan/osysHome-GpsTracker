@@ -1,0 +1,17 @@
+{
+  "Address provider": "Proveedor de dirección",
+  "Alt": "Alt.",
+  "Google API key": "Clave API de Google",
+  "GpsTracker": "rastreador gps",
+  "Is home": "esta en casa",
+  "Lat": "Latitud",
+  "LocationIQ API key": "Clave API de LocationIQ",
+  "Log": "Registro",
+  "Lon": "lon",
+  "Map": "Mapa",
+  "Provider": "Proveedor",
+  "Range": "Rango",
+  "Unknown position": "Posición desconocida",
+  "Yandex API key": "Clave API de Yandex",
+  "maps.co API key": "Clave API de Maps.co"
+}

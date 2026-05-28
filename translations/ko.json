@@ -1,0 +1,17 @@
+{
+  "Address provider": "주소 제공자",
+  "Alt": "Alt",
+  "Google API key": "구글 API 키",
+  "GpsTracker": "GPS 추적기",
+  "Is home": "집에 있어요",
+  "Lat": "위도",
+  "LocationIQ API key": "LocationIQ API 키",
+  "Log": "통나무",
+  "Lon": "론",
+  "Map": "지도",
+  "Provider": "공급자",
+  "Range": "범위",
+  "Unknown position": "알 수 없는 위치",
+  "Yandex API key": "Yandex API 키",
+  "maps.co API key": "Maps.co API 키"
+}

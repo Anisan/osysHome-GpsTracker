@@ -10,6 +10,7 @@ from plugins.GpsTracker.models.GpsDevice import GpsDevice
 from plugins.GpsTracker.models.GpsLocation import GpsLocation
 from plugins.GpsTracker.models.GpsPosition import GpsPosition
 from plugins.GpsTracker.forms.SettingForms import SettingsForm
+from app.authentication.handlers import public_endpoint
 
 class GpsTracker(BasePlugin):
 
@@ -52,6 +53,7 @@ class GpsTracker(BasePlugin):
     def route_index(self):
         '''Support ulogger'''
         @self.blueprint.route("/client/index.php",methods=['POST'])
+        @public_endpoint
         def index_ulogger():
             def castFloat(arg):
                 if arg:

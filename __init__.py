@@ -210,3 +210,92 @@ class GpsTracker(BasePlugin):
                 for device in devices:
                     device.linked_object = new_value
             session.commit()
+
+    # --- MCP integration ---
+
+    def mcp_capabilities(self):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_capabilities()
+
+    def mcp_config_schema(self):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_config_schema()
+
+    def mcp_entity_schema(self, collection: str):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_entity_schema(collection)
+
+    def mcp_list_entities(
+        self,
+        collection: str,
+        query: str = None,
+        limit: int = 100,
+        device_id=None,
+        order_desc=None,
+        start_time=None,
+        end_time=None,
+        linked_object=None,
+        has_linked_object=None,
+        is_home=None,
+    ):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_list_entities(
+            collection,
+            query=query,
+            limit=limit,
+            device_id=device_id,
+            order_desc=order_desc,
+            start_time=start_time,
+            end_time=end_time,
+            linked_object=linked_object,
+            has_linked_object=has_linked_object,
+            is_home=is_home,
+        )
+
+    def mcp_get_entity(self, collection: str, entity_id):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_get_entity(collection, entity_id)
+
+    def mcp_upsert_entity(self, collection: str, payload: dict, entity_id=None):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_upsert_entity(collection, payload, entity_id=entity_id)
+
+    def mcp_delete_entity(self, collection: str, entity_id):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_delete_entity(collection, entity_id)
+
+    def mcp_validate_entity_code(self, collection: str, code: str):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_validate_entity_code(collection, code)
+
+    def mcp_run_entity_dry(self, collection: str, code: str, context: dict = None):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_run_entity_dry(collection, code, context=context)
+
+    def mcp_invoke(self, operation: str, params: dict = None):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_invoke(operation, params or {})
+
+    def mcp_entity_revision(self, collection: str, entity_id):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_entity_revision(collection, entity_id)
+
+    def mcp_validate_entity(self, collection: str, payload: dict, entity_id=None):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_validate_entity(collection, payload, entity_id=entity_id)
+
+    def mcp_tools(self):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_descriptors()[0]
+
+    def mcp_resources(self):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_descriptors()[1]
+
+    def mcp_prompts(self):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_descriptors()[2]
+
+    def mcp_get_prompt(self, name: str, arguments: dict = None):
+        from plugins.GpsTracker import mcp_support
+        return mcp_support.mcp_get_prompt(name, arguments or {})

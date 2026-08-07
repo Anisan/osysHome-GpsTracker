@@ -130,7 +130,12 @@ class GpsTracker(BasePlugin):
             device_rec.lon = lon
             device_rec.updated = added if added else get_now_to_utc()
 
-            home_location = session.query(GpsLocation).where(GpsLocation.is_home).one_or_none()
+            home_location = (
+                session.query(GpsLocation)
+                .where(GpsLocation.is_home)
+                .order_by(GpsLocation.id)
+                .first()
+            )
             distance = None
             is_home = 0
             if home_location:
@@ -195,7 +200,8 @@ class GpsTracker(BasePlugin):
 
     def changeObject(self, event, object_name, property_name, method_name, new_value):
         with session_scope() as session:
-            devices = session.query(GpsDevice).filter(GpsDevice.linked_object == object_name).all()
-            for device in devices:
-                device.linked_object = new_value
+            if property_name is None and method_name is None:
+                devices = session.query(GpsDevice).filter(GpsDevice.linked_object == object_name).all()
+                for device in devices:
+                    device.linked_object = new_value
             session.commit()

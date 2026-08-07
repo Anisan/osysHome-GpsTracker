@@ -7,6 +7,7 @@ from app.api.models import model_404, model_result
 from app.database import row2dict, session_scope, convert_local_to_utc, convert_utc_to_local
 from app.core.lib.object import getProperty, getObject
 from plugins.GpsTracker import GpsTracker
+from plugins.GpsTracker import history_ops
 from plugins.GpsTracker.models.GpsDevice import GpsDevice
 from plugins.GpsTracker.models.GpsLocation import GpsLocation
 from plugins.GpsTracker.models.GpsPosition import GpsPosition
@@ -200,6 +201,62 @@ class GetLogs(Resource):
             }
 
             return data, 200
+
+
+@_api_ns.route("/history/stats", endpoint="gpstracker_history_stats")
+class GpsHistoryStatsResource(Resource):
+    stats_parser = reqparse.RequestParser()
+    stats_parser.add_argument("device_id", type=int, required=False, location="args")
+
+    @api_key_required
+    @handle_user_required
+    @_api_ns.expect(stats_parser)
+    def get(self):
+        """History statistics and optimization suggestions"""
+        args = self.stats_parser.parse_args()
+        result = history_ops.get_history_stats(device_id=args.get("device_id"))
+        return {"success": True, "result": result}, 200
+
+
+optimize_history_model = _api_ns.model(
+    "GpsHistoryOptimize",
+    {
+        "mode": fields.String(
+            required=True,
+            description="older_than | deduplicate | thin_stationary | clear_device",
+        ),
+        "dry_run": fields.Boolean(required=False, default=False),
+        "days": fields.Integer(required=False, description="For older_than"),
+        "distance_m": fields.Float(required=False),
+        "interval_minutes": fields.Integer(required=False),
+        "device_id": fields.Integer(required=False),
+    },
+)
+
+
+@_api_ns.route("/history/optimize", endpoint="gpstracker_history_optimize")
+class GpsHistoryOptimizeResource(Resource):
+    @api_key_required
+    @handle_user_required
+    @_api_ns.expect(optimize_history_model)
+    def post(self):
+        """Run history optimization (supports dry_run preview)"""
+        payload = request.get_json(silent=True) or {}
+        mode = payload.get("mode")
+        if not mode:
+            return {"success": False, "error": "mode is required"}, 400
+        try:
+            result = history_ops.optimize_history(
+                mode=mode,
+                dry_run=payload.get("dry_run", False),
+                days=payload.get("days"),
+                distance_m=payload.get("distance_m"),
+                interval_minutes=payload.get("interval_minutes"),
+                device_id=payload.get("device_id"),
+            )
+        except ValueError as exc:
+            return {"success": False, "error": str(exc)}, 400
+        return {"success": True, "result": result}, 200
 
 
 gps_position_model = _api_ns.model('GpsPosition', {

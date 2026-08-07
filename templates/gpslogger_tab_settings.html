@@ -1,0 +1,38 @@
+<div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="general-tab">
+    {% if form %}
+    <div class="card mb-2">
+      <div class="card-body">
+        <form method="post">
+          {{ form.hidden_tag() }}
+
+          <div class="mb-3">
+            <label class="form-label">{{ _('Map provider') }}</label>
+            {{ form.map_provider(class="form-select") }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Address provider') }}</label>
+            {{ form.address_provider(class="form-select", id="address_provider_select", **{"v-model":"settingsAddressProvider"}) }}
+          </div>
+          <div class="mb-3" v-show="settingsAddressProvider === 'google'">
+            <label class="form-label">{{ _('Google API key') }}</label>
+            {{ form.google_api_key(class="form-control", placeholder="AIza...") }}
+          </div>
+          <div class="mb-3" v-show="settingsAddressProvider === 'yandex'">
+            <label class="form-label">{{ _('Yandex API key') }}</label>
+            {{ form.yandex_api_key(class="form-control", placeholder="Yandex API key") }}
+          </div>
+          <div class="mb-3" v-show="settingsAddressProvider === 'locationiq'">
+            <label class="form-label">{{ _('LocationIQ API key') }}</label>
+            {{ form.locationiq_api_key(class="form-control", placeholder="LocationIQ API key") }}
+          </div>
+          <div class="mb-3" v-show="settingsAddressProvider === 'mapsco'">
+            <label class="form-label">{{ _('maps.co API key') }}</label>
+            {{ form.mapsco_api_key(class="form-control", placeholder="maps.co API key (optional)") }}
+          </div>
+
+          <button type="submit" class="btn btn-primary">{{ _('Save') }}</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+</div>

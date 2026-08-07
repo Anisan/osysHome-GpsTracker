@@ -1,0 +1,311 @@
+<script>
+    new Vue({
+        el: '#gps_tracker',
+        delimiters: ['[[', ']]'],
+        data: {
+            loading: "",
+            devices: [],
+            devices_dict: {},
+            locations: [],
+            positions: [],
+            historyStats: null,
+            optimizeBusy: false,
+            optimizeResult: null,
+            optimizeForm: {
+                mode: 'older_than',
+                days: 90,
+                distance_m: 15,
+                interval_minutes: 15,
+                device_id: ''
+            },
+            message: '',
+            edit_device: null,
+            edit_location: null,
+            objects: {},
+            settingsAddressProvider: '{{ settings_provider|lower }}'
+        },
+        async created() {
+            await this.fetchObjects()
+            await this.fetchDevices()
+            await this.fetchLocations()
+            await this.fetchPositions()
+            await this.fetchHistoryStats()
+        },
+        computed: {
+            objectOptions() {
+                const list = {}
+                Object.keys(this.objects).forEach(key => {
+                    list[key] = this.objects[key].description
+                })
+                return list
+            }
+        },
+        watch: {
+            'optimizeForm.mode'(mode) {
+                if (mode === 'deduplicate' && !this.optimizeForm.distance_m) {
+                    this.optimizeForm.distance_m = 15
+                }
+                if (mode === 'thin_stationary') {
+                    if (!this.optimizeForm.distance_m) this.optimizeForm.distance_m = 30
+                    if (!this.optimizeForm.interval_minutes) this.optimizeForm.interval_minutes = 15
+                }
+                if (mode === 'older_than' && !this.optimizeForm.days) {
+                    this.optimizeForm.days = 90
+                }
+            }
+        },
+        methods: {
+            fetchObjects() {
+                return axios.get('/api/object/list/details')
+                    .then(response => {
+                        this.objects = response.data.result
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching: ' + error
+                    })
+            },
+            dateFormat(dt) {
+                const today = dt
+                const date =
+                    today.getFullYear() +
+                    "-" +
+                    (today.getMonth() + 1 < 10 ? "0" : "") +
+                    (today.getMonth() + 1) +
+                    "-" +
+                    (today.getDate() < 10 ? "0" : "") +
+                    today.getDate()
+                const time =
+                    (today.getHours() < 10 ? "0" : "") +
+                    today.getHours() +
+                    ":" +
+                    (today.getMinutes() < 10 ? "0" : "") +
+                    today.getMinutes() +
+                    ":" +
+                    (today.getSeconds() < 10 ? "0" : "") +
+                    today.getSeconds()
+                return date + " " + time
+            },
+            fetchDevices() {
+                this.loading = "devices"
+                return axios.get('/api/GpsTracker/devices')
+                    .then(response => {
+                        const devs = response.data.result
+                        this.devices = devs
+                        const tmp = {}
+                        devs.forEach(element => {
+                            tmp[element.id] = element.title
+                        })
+                        this.devices_dict = tmp
+                        this.loading = ""
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching: ' + error
+                        this.loading = ""
+                    })
+            },
+            fetchLocations() {
+                this.loading = "locations"
+                return axios.get('/api/GpsTracker/locations')
+                    .then(response => {
+                        this.locations = response.data.result
+                        this.loading = ""
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching: ' + error
+                        this.loading = ""
+                    })
+            },
+            fetchPositions() {
+                this.loading = "positions"
+                let urlMethod = "/api/GpsTracker/log?&order_desc=true"
+                const now = new Date()
+                const date = new Date()
+                date.setHours(0, 0, 0, 0)
+                const to = this.dateFormat(now)
+                const from = this.dateFormat(date)
+                urlMethod += "&start_time=" + from + "&end_time=" + to
+
+                return axios.get(urlMethod)
+                    .then(response => {
+                        this.positions = response.data.result
+                        this.loading = ""
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching: ' + error
+                        this.loading = ""
+                    })
+            },
+            fetchHistoryStats() {
+                this.loading = "history_stats"
+                return axios.get("/api/GpsTracker/history/stats")
+                    .then(response => {
+                        this.historyStats = response.data.result
+                        this.loading = ""
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching history stats: ' + error
+                        this.loading = ""
+                    })
+            },
+            async refreshHistoryTab() {
+                await this.fetchHistoryStats()
+                await this.fetchPositions()
+            },
+            buildOptimizePayload(mode, params, dryRun) {
+                const payload = {
+                    mode: mode,
+                    dry_run: !!dryRun
+                }
+                const src = params || {}
+                if (src.days != null && src.days !== '') payload.days = Number(src.days)
+                if (src.distance_m != null && src.distance_m !== '') payload.distance_m = Number(src.distance_m)
+                if (src.interval_minutes != null && src.interval_minutes !== '') payload.interval_minutes = Number(src.interval_minutes)
+                if (src.device_id != null && src.device_id !== '') payload.device_id = Number(src.device_id)
+                return payload
+            },
+            runOptimize(mode, params, dryRun) {
+                if (mode === 'clear_device' && (params == null || params.device_id == null || params.device_id === '')) {
+                    this.message = {{ _('Device is required for clear device history')|tojson }}
+                    return Promise.resolve()
+                }
+                const payload = this.buildOptimizePayload(mode, params, dryRun)
+                this.optimizeBusy = true
+                return axios.post("/api/GpsTracker/history/optimize", payload)
+                    .then(response => {
+                        this.optimizeResult = response.data.result
+                        this.optimizeBusy = false
+                        this.message = ''
+                        if (!dryRun) {
+                            return this.refreshHistoryTab()
+                        }
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        const detail = (error.response && error.response.data && error.response.data.error) || error
+                        this.message = 'Error optimizing history: ' + detail
+                        this.optimizeBusy = false
+                    })
+            },
+            confirmOptimize(mode, params) {
+                confirm({{ _('Apply history optimization?')|tojson }}, { danger: true }).then(confirmed => {
+                    if (confirmed) this.runOptimize(mode, params, false)
+                })
+            },
+            runOptimizeFromForm(dryRun) {
+                const form = this.optimizeForm
+                if (form.mode === 'clear_device' && (form.device_id == null || form.device_id === '')) {
+                    this.message = {{ _('Device is required for clear device history')|tojson }}
+                    return
+                }
+                this.runOptimize(form.mode, form, dryRun)
+            },
+            confirmOptimizeFromForm() {
+                confirm({{ _('Apply history optimization?')|tojson }}, { danger: true }).then(confirmed => {
+                    if (confirmed) this.runOptimizeFromForm(false)
+                })
+            },
+            delDevice(id) {
+                return confirm({{ _('Delete this device?')|tojson }}, { danger: true }).then(confirmed => {
+                    if (!confirmed) return
+                    return axios.delete(`/api/GpsTracker/device/${id}`)
+                        .then(response => {
+                            console.log(response.data)
+                            this.fetchDevices()
+                            this.fetchPositions()
+                            this.message = ''
+                        })
+                        .catch(error => {
+                            console.log(error)
+                            this.message = 'Error fetching device: ' + error
+                        })
+                })
+            },
+            editDevice(item) {
+                this.edit_device = { ...item }
+                $('#deviceModal').modal('show')
+            },
+            updateDevice() {
+                const id = this.edit_device.id
+                return axios.post(`/api/GpsTracker/device/${id}`, this.edit_device)
+                    .then(response => {
+                        console.log(response.data)
+                        this.fetchDevices()
+                        this.edit_device = null
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching device: ' + error
+                        this.edit_device = null
+                    })
+            },
+            addLocation() {
+                this.edit_location = {}
+                $('#locationModal').modal('show')
+            },
+            editLocation(item) {
+                this.edit_location = { ...item }
+                $('#locationModal').modal('show')
+            },
+            delLocation(id) {
+                return confirm({{ _('Delete this location?')|tojson }}, { danger: true }).then(confirmed => {
+                    if (!confirmed) return
+                    return axios.delete(`/api/GpsTracker/location/${id}`)
+                        .then(response => {
+                            console.log(response.data)
+                            this.fetchLocations()
+                            this.message = ''
+                        })
+                        .catch(error => {
+                            console.log(error)
+                            this.message = 'Error fetching location: ' + error
+                        })
+                })
+            },
+            updateLocation() {
+                const url = '/api/GpsTracker/location'
+                return axios.post(url, this.edit_location)
+                    .then(response => {
+                        console.log(response.data)
+                        this.fetchLocations()
+                        this.edit_location = null
+                        this.message = ''
+                    })
+                    .catch(error => {
+                        console.log(error)
+                        this.message = 'Error fetching location: ' + error
+                        this.edit_location = null
+                    })
+            },
+            delPosition(item) {
+                return confirm({{ _('Delete this track point?')|tojson }}, { danger: true }).then(confirmed => {
+                    if (!confirmed) return
+                    const index = this.positions.findIndex(n => n.id === item.id)
+                    if (index !== -1) {
+                        this.positions.splice(index, 1)
+                    }
+                    return axios.delete(`/api/GpsTracker/position/${item.id}`)
+                        .then(response => {
+                            console.log(response.data)
+                            this.message = ''
+                            this.fetchHistoryStats()
+                        })
+                        .catch(error => {
+                            console.log(error)
+                            this.message = 'Error deleting position: ' + error
+                        })
+                })
+            }
+        }
+    })
+</script>

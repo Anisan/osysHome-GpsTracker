@@ -1,0 +1,141 @@
+<div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+    <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+        <button type="button" class="btn btn-primary btn-sm" @click="fetchHistoryStats()">
+            <i class="fas me-2" :class="loading == 'history_stats' ? 'fa-spinner fa-spin' : 'fa-rotate'"></i>
+            {{ _('Refresh')}}
+        </button>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <span class="fw-semibold">{{ _('History statistics')}}</span>
+        </div>
+        <div class="card-body">
+            <div v-if="!historyStats" class="text-muted">{{ _('Loading statistics...')}}</div>
+            <template v-else>
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100 bg-body-secondary">
+                            <div class="text-muted small mb-1">{{ _('Total positions')}}</div>
+                            <div class="fs-4 fw-semibold">[[ historyStats.total ]]</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100 bg-body-secondary">
+                            <div class="text-muted small mb-1">{{ _('Oldest')}}</div>
+                            <div class="fw-semibold text-break">[[ historyStats.oldest || '—' ]]</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100 bg-body-secondary">
+                            <div class="text-muted small mb-1">{{ _('Newest')}}</div>
+                            <div class="fw-semibold text-break">[[ historyStats.newest || '—' ]]</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100 bg-body-secondary">
+                            <div class="text-muted small mb-1">{{ _('Redundant estimates')}}</div>
+                            <div class="small"><span class="text-muted">{{ _('Approx. duplicates')}}:</span> <b>[[ historyStats.approx_duplicates ]]</b></div>
+                            <div class="small"><span class="text-muted">{{ _('Stationary redundant')}}:</span> <b>[[ historyStats.approx_stationary_redundant ]]</b></div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="mb-2">{{ _('By device')}}</h6>
+                <div v-if="historyStats.by_device && historyStats.by_device.length" class="table-responsive">
+                    <table class="table table-sm table-hover table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>{{ _('Device')}}</th>
+                                <th class="text-end">{{ _('Count')}}</th>
+                                <th>{{ _('Oldest')}}</th>
+                                <th>{{ _('Newest')}}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in historyStats.by_device" :key="'hs_'+row.device_id">
+                                <td>[[ row.title ]]</td>
+                                <td class="text-end">[[ row.count ]]</td>
+                                <td>[[ row.oldest || '—' ]]</td>
+                                <td>[[ row.newest || '—' ]]</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div v-else class="text-muted small">{{ _('No positions yet')}}</div>
+            </template>
+        </div>
+    </div>
+
+    <div v-if="historyStats && historyStats.suggestions && historyStats.suggestions.length" class="card mb-3">
+        <div class="card-header">
+            <span class="fw-semibold">{{ _('Suggestions')}}</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6" v-for="(s, si) in historyStats.suggestions" :key="'sug_'+si">
+                    <div class="border rounded p-3 h-100 bg-body-tertiary">
+                        <div class="mb-2">[[ s.reason ]]</div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                            <span class="badge text-bg-secondary">[[ s.mode ]]</span>
+                            <span class="small text-muted">{{ _('Estimated delete')}}: <b class="text-body">[[ s.estimated_delete ]]</b></span>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm me-1" @click="runOptimize(s.mode, s.params || {}, true)">{{ _('Preview')}}</button>
+                            <button type="button" class="btn btn-warning btn-sm" @click="confirmOptimize(s.mode, s.params || {})">{{ _('Apply')}}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <span class="fw-semibold">{{ _('Optimize history')}}</span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">{{ _('Run cleanup tools with preview before applying changes.')}}</p>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">{{ _('Mode')}}</label>
+                    <select class="form-select" v-model="optimizeForm.mode">
+                        <option value="older_than">{{ _('Delete older than N days')}}</option>
+                        <option value="deduplicate">{{ _('Deduplicate stays (keep first + last)')}}</option>
+                        <option value="thin_stationary">{{ _('Thin stationary (keep first + last + anchors)')}}</option>
+                        <option value="clear_device">{{ _('Clear device history')}}</option>
+                    </select>
+                </div>
+                <div class="col-md-2" v-if="optimizeForm.mode === 'older_than'">
+                    <label class="form-label">{{ _('Days')}}</label>
+                    <input type="number" min="1" class="form-control" v-model.number="optimizeForm.days">
+                </div>
+                <div class="col-md-2" v-if="optimizeForm.mode === 'deduplicate' || optimizeForm.mode === 'thin_stationary'">
+                    <label class="form-label">{{ _('Distance (m)')}}</label>
+                    <input type="number" min="1" step="1" class="form-control" v-model.number="optimizeForm.distance_m">
+                </div>
+                <div class="col-md-2" v-if="optimizeForm.mode === 'thin_stationary'">
+                    <label class="form-label">{{ _('Interval (min)')}}</label>
+                    <input type="number" min="1" class="form-control" v-model.number="optimizeForm.interval_minutes">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ _('Device')}}</label>
+                    <select class="form-select" v-model="optimizeForm.device_id">
+                        <option value="">{{ _('All devices')}}</option>
+                        <option v-for="dev in devices" :key="'od_'+dev.id" :value="dev.id">[[ dev.title ]]</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-outline-secondary me-2" :disabled="!!optimizeBusy" @click="runOptimizeFromForm(true)">{{ _('Preview')}}</button>
+                    <button type="button" class="btn btn-danger" :disabled="!!optimizeBusy" @click="confirmOptimizeFromForm()">{{ _('Apply')}}</button>
+                </div>
+            </div>
+            <div v-if="optimizeResult" class="alert alert-info mt-3 mb-0">
+                <div class="fw-semibold mb-1">{{ _('Result')}}</div>
+                <div class="small mb-1">[[ optimizeResult.mode ]] · dry_run=[[ optimizeResult.dry_run ]]</div>
+                <div v-if="optimizeResult.dry_run">{{ _('Would delete')}}: <b>[[ optimizeResult.would_delete ]]</b></div>
+                <div v-else>{{ _('Deleted')}}: <b>[[ optimizeResult.deleted ]]</b></div>
+            </div>
+        </div>
+    </div>
+</div>

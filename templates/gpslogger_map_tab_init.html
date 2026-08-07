@@ -1,0 +1,23 @@
+<script>
+  (function() {
+    const mapTab = document.getElementById('map-tab-button')
+    let mapController = null
+
+    function activateMapTab() {
+      const mapRoot = document.getElementById('gps_tracker_map_shared')
+      if (!mapRoot || typeof window.initGpsTrackerMap !== 'function') return
+      if (!mapController) {
+        mapController = window.initGpsTrackerMap(mapRoot)
+      }
+      if (!mapController) return
+
+      Promise.resolve(mapController.refreshData()).then(function() {
+        mapController.refreshSize()
+      })
+    }
+
+    if (mapTab) {
+      mapTab.addEventListener('shown.bs.tab', activateMapTab)
+    }
+  })()
+</script>

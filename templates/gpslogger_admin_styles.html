@@ -1,0 +1,36 @@
+<style>
+  #gps_tracker {
+    height: calc(100vh - 150px);
+    display: flex;
+    flex-direction: column;
+  }
+  .nav-tabs {
+    flex-shrink: 0;
+  }
+  .tab-content {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+  .tab-pane {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto;
+  }
+  #tab_map {
+    position: relative;
+    height: calc(100vh - 260px);
+    min-height: 500px;
+    padding: 0;
+    overflow: hidden;
+  }
+  #tab_map #gps_tracker_map_shared {
+    position: absolute;
+    inset: 0;
+    height: auto;
+  }
+  #devices, #locations, #positions, #history, #settings {
+    position: static;
+    z-index: 1;
+  }
+</style>

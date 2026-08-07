@@ -1,0 +1,1214 @@
+<script>
+  (function() {
+    const TOOLBAR_COLLAPSED_KEY = 'gpsTracker.mapToolbarCollapsed'
+    const VISIBLE_TRACKS_KEY = 'gpsTracker.visibleTracks'
+
+    const TILE_PROVIDERS = {
+      openstreetmap: {
+        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        options: { subdomains: ['a', 'b', 'c'] }
+      },
+      carto_light: {
+        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        options: { subdomains: ['a', 'b', 'c', 'd'], maxZoom: 20 }
+      },
+      carto_dark: {
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        options: { subdomains: ['a', 'b', 'c', 'd'], maxZoom: 20 }
+      },
+      opentopomap: {
+        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        options: { subdomains: ['a', 'b', 'c'], maxZoom: 17 }
+      },
+      '2gis': {
+        url: 'http://tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}',
+        options: {}
+      },
+      google_streets: {
+        url: 'http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+        options: { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }
+      },
+      google_hybrid: {
+        url: 'http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',
+        options: { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }
+      },
+      google_satellite: {
+        url: 'http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        options: { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }
+      },
+      yandex: {
+        url: 'https://core-renderer-tiles.maps.yandex.net/tiles?l=map&v=23.07.09-0-b230622151500&x={x}&y={y}&z={z}&scale=1&lang=ru_RU&ads=enabled&projection=web_mercator',
+        options: {}
+      }
+    }
+
+    const TRACK_COLORS = [
+      '#4a89dc', '#e9573f', '#8cc152', '#f6bb42', '#967adc',
+      '#3bafda', '#d770ad', '#37bc9b', '#ff7043', '#5d9cec',
+      '#48cfad', '#ac92ec', '#ed5565', '#fc6e51', '#a0d468'
+    ]
+
+    function getDeviceColor(device) {
+      const color = (device.color || '').trim()
+      if (color) return color
+      const key = String(device.id != null ? device.id : (device.device_id || 0))
+      let hash = 0
+      for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) - hash) + key.charCodeAt(i)
+        hash |= 0
+      }
+      return TRACK_COLORS[Math.abs(hash) % TRACK_COLORS.length]
+    }
+
+    const LOCATION_DEFAULT_RADIUS = 100
+    const LOCATION_MIN_RADIUS = 10
+
+    function getMapI18n(root) {
+      return {
+        addHint: root.dataset.i18nLocationAddHint || 'Click on the map to place a location',
+        confirmDelete: root.dataset.i18nLocationConfirmDelete || 'Delete this location?',
+        newLocation: root.dataset.i18nNewLocation || 'New location',
+        saveError: root.dataset.i18nLocationSaveError || 'Error saving location',
+        titleRequired: root.dataset.i18nLocationTitleRequired || 'Title is required',
+        radiusLabel: root.dataset.i18nLocationRadius || 'Radius',
+        trackEditHint: root.dataset.i18nTrackEditHint || 'Drag point to move',
+        trackPointDelete: root.dataset.i18nTrackPointDelete || 'Delete this track point?',
+        trackPointSaveError: root.dataset.i18nTrackPointSaveError || 'Error saving track point',
+        trackPointDeleteError: root.dataset.i18nTrackPointDeleteError || 'Error deleting track point',
+        trackPointsMany: root.dataset.i18nTrackPointsMany || 'Too many points — narrow the period or hide tracks'
+      }
+    }
+
+    const TRACK_POINTS_LIMIT = 500
+
+    function getLocationCircleStyle(location, isSelected) {
+      if (isSelected) {
+        return { color: '#e9573f', weight: 3, fillColor: '#e9573f', fillOpacity: 0.25 }
+      }
+      if (location.is_home) {
+        return { color: '#8cc152', weight: 2, fillColor: '#8cc152', fillOpacity: 0.2 }
+      }
+      return { color: '#1978cf', weight: 2, fillColor: '#1a7fc9', fillOpacity: 0.2 }
+    }
+
+    function offsetLatLng(lat, lon, distanceMeters, bearingDegrees) {
+      const earthRadius = 6378137
+      const bearing = bearingDegrees * Math.PI / 180
+      const latRad = lat * Math.PI / 180
+      const lonRad = lon * Math.PI / 180
+      const angularDistance = distanceMeters / earthRadius
+      const lat2 = Math.asin(
+        Math.sin(latRad) * Math.cos(angularDistance) +
+        Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing)
+      )
+      const lon2 = lonRad + Math.atan2(
+        Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latRad),
+        Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(lat2)
+      )
+      return L.latLng(lat2 * 180 / Math.PI, lon2 * 180 / Math.PI)
+    }
+
+    function getRadiusHandleLatLng(loc) {
+      const radius = loc.range || LOCATION_DEFAULT_RADIUS
+      return offsetLatLng(loc.lat, loc.lon, radius, 90)
+    }
+
+    function clearLocationEditor(state) {
+      if (state.locationEditLayer) {
+        state.locationEditLayer.clearLayers()
+      }
+      state.locationCenterMarker = null
+      state.locationRadiusMarker = null
+      state.locationEditCircle = null
+    }
+
+    function updateLocationEditorPanel(state) {
+      const loc = state.selectedLocation
+      if (!loc || !state.locationEditorPanel) return
+      state.locationEditorPanel.classList.remove('d-none')
+      if (state.locationTitleInput) {
+        state.locationTitleInput.value = loc.title || ''
+      }
+      if (state.locationIsHomeInput) {
+        state.locationIsHomeInput.checked = !!loc.is_home
+      }
+      if (state.locationRadiusLabel) {
+        const radius = Math.round(loc.range || LOCATION_DEFAULT_RADIUS)
+        state.locationRadiusLabel.textContent = state.i18n.radiusLabel + ': ' + radius + ' m'
+      }
+      if (state.locationDeleteButton) {
+        state.locationDeleteButton.classList.toggle('d-none', !loc.id)
+      }
+      if (state.locationEditCircle) {
+        state.locationEditCircle.setStyle(getLocationCircleStyle(loc, true))
+      }
+      requestAnimationFrame(() => positionLocationEditorPanel(state))
+    }
+
+    function hideLocationEditorPanel(state) {
+      if (state.locationEditorPanel) {
+        state.locationEditorPanel.classList.add('d-none')
+      }
+    }
+
+    function positionLocationEditorPanel(state) {
+      if (!state.locationEditorPanel || !state.map || !state.selectedLocation) return
+      if (state.locationEditorPanel.classList.contains('d-none')) return
+
+      const loc = state.selectedLocation
+      if (loc.lat == null || loc.lon == null) return
+
+      const center = state.map.latLngToContainerPoint([loc.lat, loc.lon])
+      const edge = state.map.latLngToContainerPoint(getRadiusHandleLatLng(loc))
+      const radiusPx = Math.max(Math.abs(edge.x - center.x), 28)
+      const panel = state.locationEditorPanel
+      const card = panel.querySelector('.map-location-editor-card')
+      const gap = 16
+      const panelW = panel.offsetWidth || 220
+      const panelH = panel.offsetHeight || 160
+      const containerW = state.canvas.clientWidth
+      const containerH = state.canvas.clientHeight
+
+      let left = center.x + radiusPx + gap
+      let top = center.y - panelH / 2
+      let arrowLeft = true
+
+      if (left + panelW > containerW - 8) {
+        left = center.x - radiusPx - gap - panelW
+        arrowLeft = false
+      }
+
+      top = Math.max(8, Math.min(top, containerH - panelH - 8))
+      left = Math.max(8, Math.min(left, containerW - panelW - 8))
+
+      panel.style.left = left + 'px'
+      panel.style.top = top + 'px'
+
+      if (card) {
+        card.classList.toggle('arrow-left', arrowLeft)
+        card.classList.toggle('arrow-right', !arrowLeft)
+      }
+    }
+
+    function bindLocationEditorMapEvents(state) {
+      if (!state.locationEditEnabled || !state.map || state.locationEditorMapEventsBound) return
+      state.locationEditorMapEventsBound = true
+      const reposition = () => {
+        positionLocationEditorPanel(state)
+        positionTrackPointEditorPanel(state)
+      }
+      state.map.on('move zoom resize', reposition)
+    }
+
+    function syncLocationEditor(state) {
+      if (!state.locationEditEnabled) return
+      clearLocationEditor(state)
+      const loc = state.selectedLocation
+      if (!loc || loc.lat == null || loc.lon == null || !state.map) return
+      if (!state.locationEditLayer) {
+        state.locationEditLayer = L.layerGroup().addTo(state.map)
+      }
+
+      const radius = loc.range || LOCATION_DEFAULT_RADIUS
+      const circle = L.circle([loc.lat, loc.lon], {
+        radius: radius,
+        ...getLocationCircleStyle(loc, true)
+      })
+      circle.on('click', function(e) {
+        L.DomEvent.stopPropagation(e)
+      })
+      circle.addTo(state.locationEditLayer)
+      state.locationEditCircle = circle
+
+      const centerMarker = L.marker([loc.lat, loc.lon], {
+        draggable: true,
+        zIndexOffset: 1000,
+        icon: L.divIcon({
+          className: 'location-edit-handle',
+          html: '<div class="location-edit-dot"></div>',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        })
+      })
+      centerMarker.on('click', function(e) {
+        L.DomEvent.stopPropagation(e)
+      })
+      centerMarker.on('drag', function(e) {
+        const latlng = e.target.getLatLng()
+        loc.lat = latlng.lat
+        loc.lon = latlng.lng
+        circle.setLatLng(latlng)
+        if (state.locationRadiusMarker) {
+          state.locationRadiusMarker.setLatLng(getRadiusHandleLatLng(loc))
+        }
+        updateLocationEditorPanel(state)
+        positionLocationEditorPanel(state)
+      })
+      centerMarker.addTo(state.locationEditLayer)
+      state.locationCenterMarker = centerMarker
+
+      const radiusMarker = L.marker(getRadiusHandleLatLng(loc), {
+        draggable: true,
+        zIndexOffset: 1001,
+        icon: L.divIcon({
+          className: 'location-radius-handle',
+          html: '<div class="location-radius-dot"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        })
+      })
+      radiusMarker.on('click', function(e) {
+        L.DomEvent.stopPropagation(e)
+      })
+      radiusMarker.on('drag', function(e) {
+        const center = L.latLng(loc.lat, loc.lon)
+        const handle = e.target.getLatLng()
+        loc.range = Math.max(LOCATION_MIN_RADIUS, Math.round(center.distanceTo(handle)))
+        circle.setRadius(loc.range)
+        updateLocationEditorPanel(state)
+        positionLocationEditorPanel(state)
+      })
+      radiusMarker.on('dragend', function(e) {
+        const center = L.latLng(loc.lat, loc.lon)
+        const handle = e.target.getLatLng()
+        loc.range = Math.max(LOCATION_MIN_RADIUS, Math.round(center.distanceTo(handle)))
+        e.target.setLatLng(getRadiusHandleLatLng(loc))
+        circle.setRadius(loc.range)
+        updateLocationEditorPanel(state)
+        positionLocationEditorPanel(state)
+      })
+      radiusMarker.addTo(state.locationEditLayer)
+      state.locationRadiusMarker = radiusMarker
+
+      updateLocationEditorPanel(state)
+    }
+
+    function renderLocationCircles(state) {
+      if (!state.map) return
+      state.locationsLayer.clearLayers()
+      state.locationCircleById = {}
+      const selectedId = state.locationEditEnabled && state.selectedLocation && state.selectedLocation.id
+
+      state.locations.forEach(location => {
+        if (selectedId && location.id === selectedId) return
+        const circle = L.circle([location.lat, location.lon], {
+          radius: location.range || LOCATION_DEFAULT_RADIUS,
+          ...getLocationCircleStyle(location, false)
+        })
+        circle.bindTooltip(location.title || ('#' + location.id), {
+          className: 'gps-map-tooltip'
+        })
+        if (state.locationEditEnabled) {
+          circle.on('click', function(e) {
+            L.DomEvent.stopPropagation(e)
+            if (state.locationMode === 'add') return
+            selectLocation(state, location)
+          })
+        }
+        circle.addTo(state.locationsLayer)
+        state.locationCircleById[String(location.id)] = circle
+      })
+    }
+
+    function selectLocation(state, location) {
+      if (!state.locationEditEnabled) return
+      if (state.selectedTrackPoint) {
+        clearTrackPointSelection(state)
+      }
+      state.locationMode = null
+      state.canvas.classList.remove('map-placement-mode')
+      if (state.locationHint) state.locationHint.classList.add('d-none')
+      if (state.locationAddButton) state.locationAddButton.classList.remove('active')
+      state.selectedLocation = Object.assign({}, location)
+      renderLocationCircles(state)
+      syncLocationEditor(state)
+    }
+
+    function startAddLocation(state) {
+      if (state.locationMode === 'add') {
+        cancelLocationEdit(state)
+        return
+      }
+      if (state.selectedTrackPoint) {
+        clearTrackPointSelection(state)
+      }
+      cancelLocationEdit(state)
+      state.locationMode = 'add'
+      state.canvas.classList.add('map-placement-mode')
+      if (state.locationHint) state.locationHint.classList.remove('d-none')
+      if (state.locationAddButton) state.locationAddButton.classList.add('active')
+    }
+
+    function cancelLocationEdit(state) {
+      state.locationMode = null
+      state.selectedLocation = null
+      state.canvas.classList.remove('map-placement-mode')
+      if (state.locationHint) state.locationHint.classList.add('d-none')
+      if (state.locationAddButton) state.locationAddButton.classList.remove('active')
+      hideLocationEditorPanel(state)
+      clearLocationEditor(state)
+      renderLocationCircles(state)
+    }
+
+    function onMapClickForLocation(state, e) {
+      if (!state.locationEditEnabled) return
+      if (state.locationMode === 'add') {
+        const loc = {
+          id: null,
+          title: '',
+          lat: e.latlng.lat,
+          lon: e.latlng.lng,
+          range: LOCATION_DEFAULT_RADIUS,
+          is_home: false
+        }
+        state.locationMode = null
+        state.canvas.classList.remove('map-placement-mode')
+        if (state.locationHint) state.locationHint.classList.add('d-none')
+        if (state.locationAddButton) state.locationAddButton.classList.remove('active')
+        state.selectedLocation = loc
+        renderLocationCircles(state)
+        syncLocationEditor(state)
+        if (state.locationTitleInput) {
+          state.locationTitleInput.focus()
+        }
+        return
+      }
+      if (state.selectedLocation) {
+        cancelLocationEdit(state)
+        return
+      }
+      if (state.trackEditMode && state.selectedTrackPoint) {
+        clearTrackPointSelection(state)
+      }
+    }
+
+    async function saveSelectedLocation(state) {
+      const loc = state.selectedLocation
+      if (!loc) return
+      loc.title = state.locationTitleInput ? (state.locationTitleInput.value || '').trim() : ''
+      loc.is_home = state.locationIsHomeInput ? state.locationIsHomeInput.checked : false
+      loc.range = Math.max(LOCATION_MIN_RADIUS, Math.round(loc.range || LOCATION_DEFAULT_RADIUS))
+      if (!loc.title) {
+        setMessage(state, state.i18n.titleRequired)
+        if (state.locationTitleInput) state.locationTitleInput.focus()
+        return
+      }
+      if (loc.lat == null || loc.lon == null || isNaN(loc.lat) || isNaN(loc.lon)) {
+        setMessage(state, state.i18n.saveError)
+        return
+      }
+      const wasNew = !loc.id
+      const savedLat = loc.lat
+      const savedLon = loc.lon
+      try {
+        setMessage(state, '')
+        await axios.post('/api/GpsTracker/location', loc)
+        await fetchLocations(state)
+        let saved = null
+        if (wasNew) {
+          saved = state.locations.find(item =>
+            Math.abs(item.lat - savedLat) < 0.000001 &&
+            Math.abs(item.lon - savedLon) < 0.000001
+          )
+        } else {
+          saved = state.locations.find(item => item.id === loc.id)
+        }
+        if (saved) {
+          selectLocation(state, saved)
+        } else {
+          cancelLocationEdit(state)
+        }
+      } catch (error) {
+        console.log(error)
+        const detail = (error.response && error.response.data && error.response.data.error) || error
+        setMessage(state, state.i18n.saveError + ': ' + detail)
+      }
+    }
+
+    async function deleteSelectedLocation(state) {
+      const loc = state.selectedLocation
+      if (!loc || !loc.id) return
+      const confirmed = await confirm(state.i18n.confirmDelete, { danger: true })
+      if (!confirmed) return
+      try {
+        setMessage(state, '')
+        await axios.delete('/api/GpsTracker/location/' + loc.id)
+        cancelLocationEdit(state)
+        await fetchLocations(state)
+      } catch (error) {
+        console.log(error)
+        const detail = (error.response && error.response.data && error.response.data.error) || error
+        setMessage(state, state.i18n.saveError + ': ' + detail)
+      }
+    }
+
+    function bindLocationControls(state) {
+      if (!state.locationEditEnabled || !state.locationAddButton || state.locationControlsBound) return
+      state.locationControlsBound = true
+      state.locationAddButton.addEventListener('click', () => startAddLocation(state))
+      if (state.locationSaveButton) {
+        state.locationSaveButton.addEventListener('click', () => saveSelectedLocation(state))
+      }
+      if (state.locationDeleteButton) {
+        state.locationDeleteButton.addEventListener('click', () => deleteSelectedLocation(state))
+      }
+      if (state.locationCancelButton) {
+        state.locationCancelButton.addEventListener('click', () => cancelLocationEdit(state))
+      }
+      if (state.locationIsHomeInput) {
+        state.locationIsHomeInput.addEventListener('change', () => {
+          if (!state.selectedLocation) return
+          state.selectedLocation.is_home = state.locationIsHomeInput.checked
+          if (state.locationEditCircle) {
+            state.locationEditCircle.setStyle(getLocationCircleStyle(state.selectedLocation, true))
+          }
+        })
+      }
+      if (state.trackEditToggle) {
+        state.trackEditToggle.addEventListener('click', () => {
+          setTrackEditMode(state, !state.trackEditMode)
+        })
+      }
+      if (state.trackPointDeleteButton) {
+        state.trackPointDeleteButton.addEventListener('click', () => deleteSelectedTrackPoint(state))
+      }
+      if (state.trackPointCancelButton) {
+        state.trackPointCancelButton.addEventListener('click', () => clearTrackPointSelection(state))
+      }
+    }
+
+    function createTrackPointIcon(color, selected) {
+      const size = selected ? 12 : 7
+      const border = selected ? 3 : 2
+      const total = size + border * 2
+      return L.divIcon({
+        className: 'track-point-marker',
+        html: `<div class="track-point-dot${selected ? ' is-selected' : ''}" style="width:${size}px;height:${size}px;background:${color};border:${border}px solid #fff;"></div>`,
+        iconSize: [total, total],
+        iconAnchor: [total / 2, total / 2]
+      })
+    }
+
+    function getVisibleTrackPositions(state) {
+      const visibleTracks = getVisibleTracks(state)
+      return state.positions.filter(position => visibleTracks[String(position.device_id)] !== false)
+    }
+
+    function hideTrackPointEditorPanel(state) {
+      if (state.trackPointEditorPanel) {
+        state.trackPointEditorPanel.classList.add('d-none')
+      }
+    }
+
+    function positionTrackPointEditorPanel(state) {
+      if (!state.trackPointEditorPanel || !state.map || !state.selectedTrackPoint) return
+      if (state.trackPointEditorPanel.classList.contains('d-none')) return
+
+      const point = state.selectedTrackPoint
+      const center = state.map.latLngToContainerPoint([point.lat, point.lon])
+      const panel = state.trackPointEditorPanel
+      const card = panel.querySelector('.map-track-point-editor-card')
+      const panelW = panel.offsetWidth || 210
+      const panelH = panel.offsetHeight || 120
+      const containerW = state.canvas.clientWidth
+      const containerH = state.canvas.clientHeight
+      const gap = 16
+
+      let left = center.x + gap
+      let top = center.y - panelH / 2
+      let arrowLeft = true
+
+      if (left + panelW > containerW - 8) {
+        left = center.x - gap - panelW
+        arrowLeft = false
+      }
+
+      top = Math.max(8, Math.min(top, containerH - panelH - 8))
+      left = Math.max(8, Math.min(left, containerW - panelW - 8))
+
+      panel.style.left = left + 'px'
+      panel.style.top = top + 'px'
+
+      if (card) {
+        card.classList.toggle('arrow-left', arrowLeft)
+        card.classList.toggle('arrow-right', !arrowLeft)
+      }
+    }
+
+    function updateTrackPointEditorPanel(state) {
+      const point = state.selectedTrackPoint
+      if (!point || !state.trackPointEditorPanel) return
+      state.trackPointEditorPanel.classList.remove('d-none')
+      if (state.trackPointTimeLabel) {
+        state.trackPointTimeLabel.textContent = point.added || '—'
+      }
+      if (state.trackPointCoordsLabel) {
+        state.trackPointCoordsLabel.textContent =
+          Number(point.lat).toFixed(6) + ', ' + Number(point.lon).toFixed(6)
+      }
+      requestAnimationFrame(() => positionTrackPointEditorPanel(state))
+    }
+
+    function clearTrackPointSelection(state) {
+      state.selectedTrackPoint = null
+      hideTrackPointEditorPanel(state)
+      renderTrackPoints(state)
+    }
+
+    function selectTrackPoint(state, position) {
+      if (!state.trackEditMode) return
+      if (state.selectedLocation || state.locationMode) {
+        cancelLocationEdit(state)
+      }
+      state.selectedTrackPoint = position
+      updateTrackPointEditorPanel(state)
+      renderTrackPoints(state)
+    }
+
+    function setTrackEditMode(state, enabled) {
+      state.trackEditMode = !!enabled
+      if (state.trackEditToggle) {
+        state.trackEditToggle.classList.toggle('active', state.trackEditMode)
+        state.trackEditToggle.classList.toggle('btn-warning', state.trackEditMode)
+        state.trackEditToggle.classList.toggle('btn-outline-secondary', !state.trackEditMode)
+        state.trackEditToggle.setAttribute('aria-pressed', state.trackEditMode ? 'true' : 'false')
+      }
+      if (state.trackEditMode) {
+        cancelLocationEdit(state)
+        const visibleCount = getVisibleTrackPositions(state).length
+        if (visibleCount > TRACK_POINTS_LIMIT) {
+          setMessage(state, state.i18n.trackPointsMany)
+          state.trackEditMode = false
+          if (state.trackEditToggle) {
+            state.trackEditToggle.classList.remove('active', 'btn-warning')
+            state.trackEditToggle.classList.add('btn-outline-secondary')
+            state.trackEditToggle.setAttribute('aria-pressed', 'false')
+          }
+          return
+        }
+        setMessage(state, '')
+      } else {
+        clearTrackPointSelection(state)
+      }
+      renderTrackPoints(state)
+    }
+
+    function renderTrackPoints(state) {
+      if (!state.trackPointsLayer) return
+      state.trackPointsLayer.clearLayers()
+      if (!state.trackEditMode || !state.map) return
+
+      const selectedId = state.selectedTrackPoint && state.selectedTrackPoint.id
+      const visibleTracks = getVisibleTracks(state)
+
+      state.positions.forEach(position => {
+        if (visibleTracks[String(position.device_id)] === false) return
+        const device = state.devices.find(item => String(item.id) === String(position.device_id))
+        const color = device ? getDeviceColor(device) : '#4a89dc'
+        const isSelected = selectedId === position.id
+
+        const marker = L.marker([position.lat, position.lon], {
+          draggable: isSelected,
+          zIndexOffset: isSelected ? 1200 : 400,
+          icon: createTrackPointIcon(color, isSelected)
+        })
+
+        marker.on('click', function(e) {
+          L.DomEvent.stopPropagation(e)
+          if (!isSelected) {
+            selectTrackPoint(state, position)
+          }
+        })
+
+        if (isSelected) {
+          marker.on('drag', function(e) {
+            const latlng = e.target.getLatLng()
+            position.lat = latlng.lat
+            position.lon = latlng.lng
+            if (state.trackPointCoordsLabel) {
+              state.trackPointCoordsLabel.textContent =
+                Number(latlng.lat).toFixed(6) + ', ' + Number(latlng.lng).toFixed(6)
+            }
+            renderTrackPolylines(state)
+            positionTrackPointEditorPanel(state)
+          })
+          marker.on('dragend', function(e) {
+            saveTrackPointMove(state, position, e.target.getLatLng())
+          })
+        }
+
+        if (position.added) {
+          marker.bindTooltip(position.added, {
+            direction: 'top',
+            className: 'gps-map-tooltip'
+          })
+        }
+
+        marker.addTo(state.trackPointsLayer)
+      })
+    }
+
+    async function saveTrackPointMove(state, position, latlng) {
+      const prevLat = position.lat
+      const prevLon = position.lon
+      position.lat = latlng.lat
+      position.lon = latlng.lng
+      try {
+        setMessage(state, '')
+        await axios.put('/api/GpsTracker/position/' + position.id, {
+          lat: latlng.lat,
+          lon: latlng.lng
+        })
+        renderTrackPolylines(state)
+        updateTrackPointEditorPanel(state)
+      } catch (error) {
+        console.log(error)
+        position.lat = prevLat
+        position.lon = prevLon
+        const detail = (error.response && error.response.data && error.response.data.error) || error
+        setMessage(state, state.i18n.trackPointSaveError + ': ' + detail)
+        renderTrackPoints(state)
+        renderTrackPolylines(state)
+      }
+    }
+
+    async function deleteSelectedTrackPoint(state) {
+      const point = state.selectedTrackPoint
+      if (!point) return
+      const confirmed = await confirm(state.i18n.trackPointDelete, { danger: true })
+      if (!confirmed) return
+      try {
+        setMessage(state, '')
+        await axios.delete('/api/GpsTracker/position/' + point.id)
+        state.positions = state.positions.filter(item => item.id !== point.id)
+        clearTrackPointSelection(state)
+        renderMapLayers(state)
+      } catch (error) {
+        console.log(error)
+        const detail = (error.response && error.response.data && error.response.data.error) || error
+        setMessage(state, state.i18n.trackPointDeleteError + ': ' + detail)
+      }
+    }
+
+    function renderTrackPolylines(state) {
+      if (!state.map || !state.tracksLayer) return
+      state.tracksLayer.clearLayers()
+      const visibleTracks = getVisibleTracks(state)
+
+      state.devices.forEach(device => {
+        if (visibleTracks[String(device.id)] === false) return
+        const points = state.positions
+          .filter(item => String(item.device_id) === String(device.id))
+          .map(item => [item.lat, item.lon])
+        if (points.length > 0) {
+          L.polyline(points, {
+            color: getDeviceColor(device)
+          }).addTo(state.tracksLayer)
+        }
+      })
+    }
+
+    function renderDeviceMarkers(state) {
+      if (!state.map || !state.markersLayer) return
+      state.markersLayer.clearLayers()
+      const visibleTracks = getVisibleTracks(state)
+
+      state.devices.forEach(device => {
+        if (visibleTracks[String(device.id)] === false) return
+        if (device.lat == null || device.lon == null) return
+
+        const marker = L.marker([device.lat, device.lon], {
+          icon: createMarkerIcon(device)
+        })
+        const markerTitle = resolveDeviceLabel(device)
+        marker.bindTooltip(
+          `<div class="marker-tooltip">
+            ${device.avatar ? `<img src="${device.avatar}" class="tooltip-avatar">` : ''}
+            <div class="tooltip-content">
+              <h5>${markerTitle || ''}</h5>
+              <small>${device.updated || ''}</small>
+            </div>
+          </div>`,
+          { direction: 'top', className: 'gps-map-tooltip gps-map-tooltip--marker' }
+        )
+        marker.addTo(state.markersLayer)
+      })
+    }
+
+    function getTileProviderConfig(providerKey) {
+      if (providerKey && TILE_PROVIDERS[providerKey]) {
+        return TILE_PROVIDERS[providerKey]
+      }
+      return TILE_PROVIDERS.openstreetmap
+    }
+
+    function resolveDeviceLabel(device) {
+      return device.user || device.title || device.device_id || device.id
+    }
+
+    function createTrackAvatarHtml(device) {
+      const pinColor = getDeviceColor(device)
+      if (device.avatar) {
+        return `<img src="${device.avatar}" class="track-avatar" style="border-color: ${pinColor}" alt="">`
+      }
+      return `<span class="track-avatar track-avatar-default" style="background-color: ${pinColor}"><i class="fas fa-user"></i></span>`
+    }
+
+    function padValue(value) {
+      return value < 10 ? '0' + value : String(value)
+    }
+
+    function toDatetimeLocalValue(dt) {
+      return dt.getFullYear() + '-' +
+        padValue(dt.getMonth() + 1) + '-' +
+        padValue(dt.getDate()) + 'T' +
+        padValue(dt.getHours()) + ':' +
+        padValue(dt.getMinutes())
+    }
+
+    function formatApiDate(dt) {
+      return dt.getFullYear() + '-' +
+        padValue(dt.getMonth() + 1) + '-' +
+        padValue(dt.getDate()) + ' ' +
+        padValue(dt.getHours()) + ':' +
+        padValue(dt.getMinutes()) + ':' +
+        padValue(dt.getSeconds())
+    }
+
+    function createMarkerIcon(device) {
+      const pinColor = getDeviceColor(device)
+      return L.divIcon({
+        html: `
+          <div class="avatar-marker">
+            ${device.avatar
+              ? `<img src="${device.avatar}" class="marker-avatar" style="border-color: ${pinColor}">`
+              : `<div class="default-avatar" style="background-color: ${pinColor}">
+                  <i class="fas fa-user"></i>
+                </div>`
+            }
+            <i class="fas fa-location-pin" style="
+              position: absolute;
+              left: 50%;
+              top: 28px;
+              transform: translateX(-50%);
+              color: ${pinColor};
+              font-size: 24px;
+              z-index: 1;
+              text-shadow: 0 0 3px white;
+            "></i>
+          </div>
+        `,
+        className: 'custom-marker',
+        iconSize: [48, 56],
+        iconAnchor: [24, 56],
+        popupAnchor: [0, -56]
+      })
+    }
+
+    function getSelectedRange(state) {
+      const period = state.periodSelect.value
+      const now = new Date()
+      const start = new Date(now)
+      const end = new Date(now)
+
+      if (period === 'today') {
+        start.setHours(0, 0, 0, 0)
+        return { start, end }
+      }
+      if (period === 'last24h') {
+        start.setHours(start.getHours() - 24)
+        return { start, end }
+      }
+      if (period === 'yesterday') {
+        start.setDate(start.getDate() - 1)
+        start.setHours(0, 0, 0, 0)
+        end.setDate(end.getDate() - 1)
+        end.setHours(23, 59, 59, 999)
+        return { start, end }
+      }
+      if (period === 'week') {
+        start.setDate(start.getDate() - 7)
+        return { start, end }
+      }
+      if (period === 'custom') {
+        const customStart = state.startInput.value ? new Date(state.startInput.value) : null
+        const customEnd = state.endInput.value ? new Date(state.endInput.value) : null
+        if (!customStart || !customEnd) return null
+        return { start: customStart, end: customEnd }
+      }
+    }
+
+    function setMessage(state, message) {
+      if (!state.messageBox || !state.messageText) return
+      if (!message) {
+        state.messageBox.classList.add('d-none')
+        state.messageText.textContent = ''
+        return
+      }
+      state.messageText.textContent = message
+      state.messageBox.classList.remove('d-none')
+    }
+
+    function setLoading(state, loading) {
+      state.isLoading = loading
+      if (!state.refreshButton) return
+      state.refreshButton.disabled = loading
+      const icon = state.refreshButton.querySelector('i')
+      if (icon) {
+        icon.className = loading ? 'fas fa-spinner fa-spin me-2' : 'fas fa-rotate me-2'
+      }
+    }
+
+    function updateCustomPeriodVisibility(state) {
+      state.customPeriod.classList.toggle('d-none', state.periodSelect.value !== 'custom')
+    }
+
+    function loadVisibleTracks() {
+      try {
+        const raw = localStorage.getItem(VISIBLE_TRACKS_KEY)
+        if (!raw) return {}
+        const parsed = JSON.parse(raw)
+        return (parsed && typeof parsed === 'object') ? parsed : {}
+      } catch (error) {
+        return {}
+      }
+    }
+
+    function saveVisibleTracks(visibleTracks) {
+      try {
+        localStorage.setItem(VISIBLE_TRACKS_KEY, JSON.stringify(visibleTracks))
+      } catch (error) {
+        // ignore storage errors
+      }
+    }
+
+    function getVisibleTracks(state) {
+      const result = {}
+      const checkboxes = state.tracksContainer.querySelectorAll('input[type="checkbox"][data-device-id]')
+      checkboxes.forEach(checkbox => {
+        result[checkbox.dataset.deviceId] = checkbox.checked
+      })
+      return result
+    }
+
+    function resolveTrackVisibility(deviceId, visibleTracks) {
+      const key = String(deviceId)
+      if (Object.prototype.hasOwnProperty.call(visibleTracks, key)) {
+        return visibleTracks[key] !== false
+      }
+      return true
+    }
+
+    function persistVisibleTracks(state) {
+      const visibleTracks = getVisibleTracks(state)
+      const merged = {}
+      state.devices.forEach(device => {
+        const id = String(device.id)
+        merged[id] = visibleTracks[id] !== false
+      })
+      saveVisibleTracks(merged)
+    }
+
+    function renderTrackToggles(state) {
+      const currentTracks = getVisibleTracks(state)
+      const hasCurrentTracks = Object.keys(currentTracks).length > 0
+      const visibleTracks = hasCurrentTracks ? currentTracks : loadVisibleTracks()
+      state.tracksContainer.innerHTML = ''
+      state.devices.forEach(device => {
+        const checked = resolveTrackVisibility(device.id, visibleTracks)
+        const deviceLabel = resolveDeviceLabel(device)
+        const wrapper = document.createElement('div')
+        wrapper.className = 'form-check mb-2'
+        wrapper.innerHTML = `
+          <input class="form-check-input" type="checkbox" id="track_toggle_${device.id}" data-device-id="${device.id}" ${checked ? 'checked' : ''}>
+          <label class="form-check-label d-flex align-items-center gap-2" for="track_toggle_${device.id}">
+            ${createTrackAvatarHtml(device)}
+            <span>${deviceLabel}</span>
+          </label>
+        `
+        const checkbox = wrapper.querySelector('input')
+        checkbox.addEventListener('change', () => {
+          persistVisibleTracks(state)
+          renderMapLayers(state, { fitBounds: true })
+        })
+        state.tracksContainer.appendChild(wrapper)
+      })
+    }
+
+    function renderMapLayers(state, options) {
+      if (!state.map) return
+      const opts = options || {}
+
+      state.locationsLayer.clearLayers()
+      renderLocationCircles(state)
+      if (state.locationEditEnabled) {
+        syncLocationEditor(state)
+      }
+
+      renderTrackPolylines(state)
+      renderDeviceMarkers(state)
+      renderTrackPoints(state)
+
+      if (opts.fitBounds) {
+        const bounds = new L.LatLngBounds()
+        let hasVisiblePoints = false
+        const visibleTracks = getVisibleTracks(state)
+
+        state.devices.forEach(device => {
+          if (visibleTracks[String(device.id)] === false) return
+          if (device.lat != null && device.lon != null) {
+            bounds.extend([device.lat, device.lon])
+            hasVisiblePoints = true
+          }
+          state.positions
+            .filter(item => String(item.device_id) === String(device.id))
+            .forEach(item => {
+              bounds.extend([item.lat, item.lon])
+              hasVisiblePoints = true
+            })
+        })
+
+        if (hasVisiblePoints) {
+          state.map.fitBounds(bounds.pad(0.2))
+        }
+      }
+    }
+
+    function ensureMap(state) {
+      if (state.map) return
+      state.map = L.map(state.canvas, {
+        zoomSnap: 0.5,
+        zoomControl: true,
+        attributionControl: false,
+      }).setView([47.41322, -1.219482], 10)
+
+      const providerConfig = getTileProviderConfig(state.mapProvider)
+      state.tileLayer = L.tileLayer(providerConfig.url, providerConfig.options).addTo(state.map)
+
+      state.locationsLayer = L.layerGroup().addTo(state.map)
+      state.tracksLayer = L.layerGroup().addTo(state.map)
+      state.trackPointsLayer = L.layerGroup().addTo(state.map)
+      state.markersLayer = L.layerGroup().addTo(state.map)
+      if (state.locationEditEnabled) {
+        state.locationEditLayer = L.layerGroup().addTo(state.map)
+        state.map.on('click', (e) => onMapClickForLocation(state, e))
+        bindLocationEditorMapEvents(state)
+      }
+    }
+
+    async function fetchDevices(state) {
+      const response = await axios.get(`/api/GpsTracker/devices`)
+      state.devices = response.data.result || []
+      renderTrackToggles(state)
+    }
+
+    async function fetchLocations(state) {
+      const response = await axios.get(`/api/GpsTracker/locations`)
+      state.locations = response.data.result || []
+      renderLocationCircles(state)
+      if (state.locationEditEnabled && state.selectedLocation && state.selectedLocation.id) {
+        const updated = state.locations.find(item => item.id === state.selectedLocation.id)
+        if (updated) {
+          state.selectedLocation = Object.assign({}, updated)
+          syncLocationEditor(state)
+        }
+      }
+    }
+
+    async function fetchPositions(state) {
+      const range = getSelectedRange(state)
+      if (!range || range.start > range.end) {
+        throw new Error('Invalid period')
+      }
+      let urlMethod = "/api/GpsTracker/log?&order_desc=true"
+      urlMethod += "&start_time=" + encodeURIComponent(formatApiDate(range.start))
+      urlMethod += "&end_time=" + encodeURIComponent(formatApiDate(range.end))
+      const response = await axios.get(urlMethod)
+      state.positions = response.data.result || []
+    }
+
+    async function refreshData(state) {
+      try {
+        setLoading(state, true)
+        setMessage(state, '')
+        ensureMap(state)
+        await fetchDevices(state)
+        await fetchLocations(state)
+        await fetchPositions(state)
+        setTimeout(() => {
+          state.map.invalidateSize()
+          renderMapLayers(state, { fitBounds: true })
+        }, 100)
+      } catch (error) {
+        console.log(error)
+        setMessage(state, 'Error loading map: ' + error)
+      } finally {
+        setLoading(state, false)
+      }
+    }
+
+    function refreshSize(state) {
+      ensureMap(state)
+      setTimeout(() => {
+        state.map.invalidateSize()
+        renderMapLayers(state)
+        positionLocationEditorPanel(state)
+        positionTrackPointEditorPanel(state)
+      }, 100)
+    }
+
+    function setAllTracks(state, visible) {
+      const checkboxes = state.tracksContainer.querySelectorAll('input[type="checkbox"][data-device-id]')
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = visible
+      })
+      persistVisibleTracks(state)
+      renderMapLayers(state, { fitBounds: true })
+    }
+
+    function isToolbarCollapsedSaved() {
+      try {
+        return localStorage.getItem(TOOLBAR_COLLAPSED_KEY) === '1'
+      } catch (error) {
+        return false
+      }
+    }
+
+    function saveToolbarCollapsed(collapsed) {
+      try {
+        localStorage.setItem(TOOLBAR_COLLAPSED_KEY, collapsed ? '1' : '0')
+      } catch (error) {
+        // ignore storage errors
+      }
+    }
+
+    function setToolbarCollapsed(state, collapsed, options) {
+      if (!state.toolbar || !state.toolbarToggle) return
+      const opts = options || {}
+      state.toolbar.classList.toggle('is-collapsed', collapsed)
+      state.toolbarToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
+      const icon = state.toolbarToggle.querySelector('.js-map-toggle-icon')
+      if (icon) {
+        icon.className = collapsed
+          ? 'fas fa-sliders-h js-map-toggle-icon'
+          : 'fas fa-chevron-up js-map-toggle-icon'
+      }
+      if (opts.persist !== false) {
+        saveToolbarCollapsed(collapsed)
+      }
+      if (opts.refresh !== false) {
+        refreshSize(state)
+      }
+    }
+
+    window.initGpsTrackerMap = function(root) {
+      if (!root) return null
+      if (root._gpsTrackerMapController) return root._gpsTrackerMapController
+      if (typeof L === 'undefined') {
+        console.error('GpsTracker map: Leaflet is not loaded')
+        return null
+      }
+
+      const state = {
+        root: root,
+        map: null,
+        locationsLayer: null,
+        tracksLayer: null,
+        trackPointsLayer: null,
+        markersLayer: null,
+        tileLayer: null,
+        devices: [],
+        locations: [],
+        positions: [],
+        canvas: root.querySelector('.js-map-canvas'),
+        messageBox: root.querySelector('.js-map-message'),
+        messageText: root.querySelector('.js-map-message-text'),
+        refreshButton: root.querySelector('.js-map-refresh'),
+        periodSelect: root.querySelector('.js-map-period'),
+        customPeriod: root.querySelector('.js-map-custom-period'),
+        startInput: root.querySelector('.js-map-start'),
+        endInput: root.querySelector('.js-map-end'),
+        applyCustomButton: root.querySelector('.js-map-apply-custom'),
+        showAllButton: root.querySelector('.js-map-show-all'),
+        hideAllButton: root.querySelector('.js-map-hide-all'),
+        toolbar: root.querySelector('.map-toolbar'),
+        toolbarToggle: root.querySelector('.js-map-toggle'),
+        tracksContainer: root.querySelector('.js-map-tracks'),
+        mapProvider: (root.dataset.mapProvider || 'openstreetmap').trim().toLowerCase(),
+        locationEditEnabled: root.dataset.locationEdit === '1',
+        isLoading: false,
+        i18n: getMapI18n(root),
+        locationMode: null,
+        selectedLocation: null,
+        locationCircleById: {},
+        locationEditLayer: null,
+        locationCenterMarker: null,
+        locationRadiusMarker: null,
+        locationEditCircle: null,
+        locationControlsBound: false,
+        locationEditorMapEventsBound: false,
+        locationEditorPanel: root.querySelector('.js-map-location-editor'),
+        locationHint: root.querySelector('.js-map-location-hint'),
+        locationAddButton: root.querySelector('.js-map-location-add'),
+        locationTitleInput: root.querySelector('.js-map-location-title'),
+        locationRadiusLabel: root.querySelector('.js-map-location-radius-label'),
+        locationIsHomeInput: root.querySelector('.js-map-location-is-home'),
+        locationSaveButton: root.querySelector('.js-map-location-save'),
+        locationDeleteButton: root.querySelector('.js-map-location-delete'),
+        locationCancelButton: root.querySelector('.js-map-location-cancel'),
+        trackEditMode: false,
+        selectedTrackPoint: null,
+        trackEditToggle: root.querySelector('.js-map-track-edit'),
+        trackPointEditorPanel: root.querySelector('.js-map-track-point-editor'),
+        trackPointTimeLabel: root.querySelector('.js-map-track-point-time'),
+        trackPointCoordsLabel: root.querySelector('.js-map-track-point-coords'),
+        trackPointDeleteButton: root.querySelector('.js-map-track-point-delete'),
+        trackPointCancelButton: root.querySelector('.js-map-track-point-cancel')
+      }
+
+      if (!state.canvas || !state.refreshButton || !state.periodSelect ||
+          !state.startInput || !state.endInput || !state.tracksContainer) {
+        console.error('GpsTracker map: required elements not found')
+        return null
+      }
+
+      const now = new Date()
+      const dayStart = new Date(now)
+      dayStart.setHours(0, 0, 0, 0)
+      state.startInput.value = toDatetimeLocalValue(dayStart)
+      state.endInput.value = toDatetimeLocalValue(now)
+
+      state.refreshButton.addEventListener('click', () => refreshData(state))
+      state.periodSelect.addEventListener('change', () => {
+        updateCustomPeriodVisibility(state)
+        if (state.periodSelect.value !== 'custom') {
+          refreshData(state)
+        }
+      })
+      if (state.applyCustomButton) {
+        state.applyCustomButton.addEventListener('click', () => refreshData(state))
+      }
+      if (state.showAllButton) {
+        state.showAllButton.addEventListener('click', () => setAllTracks(state, true))
+      }
+      if (state.hideAllButton) {
+        state.hideAllButton.addEventListener('click', () => setAllTracks(state, false))
+      }
+      if (state.toolbarToggle) {
+        state.toolbarToggle.addEventListener('click', () => {
+          setToolbarCollapsed(state, !state.toolbar.classList.contains('is-collapsed'))
+        })
+        setToolbarCollapsed(state, isToolbarCollapsedSaved(), { refresh: false })
+      }
+      updateCustomPeriodVisibility(state)
+      bindLocationControls(state)
+
+      const controller = {
+        refreshData: () => refreshData(state),
+        refreshSize: () => refreshSize(state)
+      }
+      root._gpsTrackerMapController = controller
+      return controller
+    }
+  })();
+</script>

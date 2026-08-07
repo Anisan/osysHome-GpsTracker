@@ -1,0 +1,20 @@
+{% extends "layouts/base-fullscreen.html" %}
+{% block title %}{{ _('Map') }}{% endblock %}
+{% block content %}
+{% include "gpslogger_assets.html" %}
+<style>
+  html, body {
+    height: 100%;
+  }
+  body #gps_tracker_map_shared {
+    height: 100vh !important;
+  }
+</style>
+{% include "gpslogger_map_styles.html" %}
+{% include "gpslogger_map_ui.html" %}
+{% include "gpslogger_map_logic.html" %}
+{% include "gpslogger_map_init.html" %}
+{% endblock content %}
+{% block javascripts %}
+<script src="{{ config.ASSETS_ROOT }}/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+{% endblock javascripts %}

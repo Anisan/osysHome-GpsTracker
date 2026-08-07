@@ -1,0 +1,9 @@
+<script>
+  (function() {
+    const root = document.getElementById('gps_tracker_map_shared')
+    const controller = window.initGpsTrackerMap(root)
+    if (controller) {
+      controller.refreshData()
+    }
+  })()
+</script>

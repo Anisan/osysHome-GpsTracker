@@ -1,0 +1,63 @@
+<div class="modal fade" id="deviceModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ _('Device')}}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div v-if="edit_device" class="modal-body">
+                <div>
+                    <label class="form-label">{{ _('Title')}}</label>
+                    <input class="form-control" v-model="edit_device.title">
+                </div>
+                <div>
+                    <label class="form-check-label" for="flexCheckDefault">
+                        {{ _('Linked object')}}
+                    </label>
+                    <select-with-filter placeholder="Select object" :options="objectOptions" v-model="edit_device.linked_object"></select-with-filter>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal" @click="updateDevice()">{{ _('Save')}}</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Close')}}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="locationModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ _('Location')}}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div v-if="edit_location" class="modal-body">
+                <div>
+                    <label class="form-label">{{ _('Title')}}</label>
+                    <input class="form-control" v-model="edit_location.title">
+                </div>
+                <div>
+                    <label class="form-label">{{ _('Lat')}}</label>
+                    <input class="form-control" v-model="edit_location.lat">
+                </div>
+                <div>
+                    <label class="form-label">{{ _('Lon')}}</label>
+                    <input class="form-control" v-model="edit_location.lon">
+                </div>
+                <div>
+                    <label class="form-label">{{ _('Range')}}</label>
+                    <input class="form-control" v-model="edit_location.range">
+                </div>
+                <div class="mt-2">
+                    <label class="form-label">{{ _('Is home')}}</label>
+                    <input type="checkbox" class="form-check-control" v-model="edit_location.is_home">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal" @click="updateLocation()">{{ _('Save')}}</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Close')}}</button>
+            </div>
+        </div>
+    </div>
+</div>

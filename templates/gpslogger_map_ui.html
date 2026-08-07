@@ -1,0 +1,107 @@
+<div id="gps_tracker_map_shared"
+  data-map-provider="{{ map_provider|default('openstreetmap') }}"
+  data-location-edit="{{ '1' if map_location_edit|default(false) else '0' }}"
+  data-i18n-location-add-hint="{{ _('Click on the map to place a location') }}"
+  data-i18n-location-confirm-delete="{{ _('Delete this location?') }}"
+  data-i18n-new-location="{{ _('New location') }}"
+  data-i18n-location-save-error="{{ _('Error saving location') }}"
+  data-i18n-location-title-required="{{ _('Title is required') }}"
+  data-i18n-location-radius="{{ _('Radius') }}"
+  data-i18n-track-edit-hint="{{ _('Drag point to move') }}"
+  data-i18n-track-point-delete="{{ _('Delete this track point?') }}"
+  data-i18n-track-point-save-error="{{ _('Error saving track point') }}"
+  data-i18n-track-point-delete-error="{{ _('Error deleting track point') }}"
+  data-i18n-track-points-many="{{ _('Too many points — narrow the period or hide tracks') }}">
+  <div class="alert alert-warning map-alert mb-0 d-none js-map-message">
+    <p class="mb-0 js-map-message-text"></p>
+  </div>
+
+  <div class="map-page">
+    <div class="map-toolbar">
+      <div class="map-toolbar-header">
+        <button type="button" class="btn btn-primary btn-sm js-map-refresh" title="{{ _('Refresh') }}">
+          <i class="fas fa-rotate me-2"></i>
+          <span class="js-map-refresh-label">{{ _('Refresh') }}</span>
+        </button>
+        {% if map_location_edit|default(false) %}
+        <button type="button" class="btn btn-sm btn-outline-success js-map-location-add" title="{{ _('Add location') }}">
+          <i class="fas fa-plus"></i>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary js-map-track-edit" title="{{ _('Edit track points') }}" aria-pressed="false">
+          <i class="fas fa-route"></i>
+        </button>
+        {% endif %}
+        <button type="button" class="btn btn-sm btn-outline-secondary js-map-toggle" aria-expanded="true" aria-label="{{ _('Map') }}">
+          <i class="fas fa-chevron-up js-map-toggle-icon"></i>
+        </button>
+      </div>
+      <div class="map-toolbar-body">
+
+      <div class="mb-3">
+        <label class="form-label mb-1">{{ _('Period') }}</label>
+        <select class="form-select form-select-sm js-map-period">
+          <option value="today">{{ _('Today') }}</option>
+          <option value="last24h">{{ _('Last 24 hours') }}</option>
+          <option value="yesterday">{{ _('Yesterday') }}</option>
+          <option value="week">{{ _('Week') }}</option>
+          <option value="custom">{{ _('Custom') }}</option>
+        </select>
+      </div>
+
+      <div class="mb-3 js-map-custom-period d-none">
+        <label class="form-label mb-1">{{ _('Start') }}</label>
+        <input type="datetime-local" class="form-control form-control-sm mb-2 js-map-start">
+        <label class="form-label mb-1">{{ _('End') }}</label>
+        <input type="datetime-local" class="form-control form-control-sm mb-2 js-map-end">
+        <button type="button" class="btn btn-outline-primary btn-sm w-100 js-map-apply-custom">
+          {{ _('Apply') }}
+        </button>
+      </div>
+
+      <div class="mb-2 d-flex justify-content-between align-items-center">
+        <label class="form-label mb-0">{{ _('Tracks') }}</label>
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn btn-outline-secondary btn-sm js-map-show-all">{{ _('Show all') }}</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm js-map-hide-all">{{ _('Hide all') }}</button>
+        </div>
+      </div>
+
+      <div class="track-list js-map-tracks"></div>
+      </div>
+    </div>
+    <div class="map-container">
+      {% if map_location_edit|default(false) %}
+      <div class="map-location-hint alert alert-info py-2 px-3 mb-0 d-none js-map-location-hint">
+        {{ _('Click on the map to place a location') }}
+      </div>
+      <div class="map-location-editor d-none js-map-location-editor">
+        <div class="map-location-editor-card shadow">
+          <input type="text" class="form-control form-control-sm js-map-location-title" placeholder="{{ _('Title') }}">
+          <div class="form-check mt-2 mb-0">
+            <input type="checkbox" class="form-check-input js-map-location-is-home" id="map_location_is_home">
+            <label class="form-check-label" for="map_location_is_home">{{ _('Is home') }}</label>
+          </div>
+          <div class="small text-muted mt-2 js-map-location-radius-label"></div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="button" class="btn btn-success btn-sm js-map-location-save">{{ _('Save') }}</button>
+            <button type="button" class="btn btn-danger btn-sm js-map-location-delete">{{ _('Delete') }}</button>
+            <button type="button" class="btn btn-secondary btn-sm js-map-location-cancel">{{ _('Cancel') }}</button>
+          </div>
+        </div>
+      </div>
+      <div class="map-track-point-editor d-none js-map-track-point-editor">
+        <div class="map-track-point-editor-card shadow">
+          <div class="small fw-semibold js-map-track-point-time"></div>
+          <div class="small text-muted js-map-track-point-coords"></div>
+          <div class="small text-muted mt-1 js-map-track-point-hint">{{ _('Drag point to move') }}</div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="button" class="btn btn-danger btn-sm js-map-track-point-delete">{{ _('Delete') }}</button>
+            <button type="button" class="btn btn-secondary btn-sm js-map-track-point-cancel">{{ _('Cancel') }}</button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      <div class="map-canvas js-map-canvas"></div>
+    </div>
+  </div>
+</div>

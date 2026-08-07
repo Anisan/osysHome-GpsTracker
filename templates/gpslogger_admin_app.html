@@ -66,27 +66,6 @@
                         this.message = 'Error fetching: ' + error
                     })
             },
-            dateFormat(dt) {
-                const today = dt
-                const date =
-                    today.getFullYear() +
-                    "-" +
-                    (today.getMonth() + 1 < 10 ? "0" : "") +
-                    (today.getMonth() + 1) +
-                    "-" +
-                    (today.getDate() < 10 ? "0" : "") +
-                    today.getDate()
-                const time =
-                    (today.getHours() < 10 ? "0" : "") +
-                    today.getHours() +
-                    ":" +
-                    (today.getMinutes() < 10 ? "0" : "") +
-                    today.getMinutes() +
-                    ":" +
-                    (today.getSeconds() < 10 ? "0" : "") +
-                    today.getSeconds()
-                return date + " " + time
-            },
             fetchDevices() {
                 this.loading = "devices"
                 return axios.get('/api/GpsTracker/devices')
@@ -123,13 +102,11 @@
             },
             fetchPositions() {
                 this.loading = "positions"
+                const T = window.GpsTrackerTime
+                const tz = T.getUserTimezone()
                 let urlMethod = "/api/GpsTracker/log?&order_desc=true"
-                const now = new Date()
-                const date = new Date()
-                date.setHours(0, 0, 0, 0)
-                const to = this.dateFormat(now)
-                const from = this.dateFormat(date)
-                urlMethod += "&start_time=" + from + "&end_time=" + to
+                urlMethod += "&start_time=" + encodeURIComponent(T.startOfToday(tz))
+                urlMethod += "&end_time=" + encodeURIComponent(T.now(tz))
 
                 return axios.get(urlMethod)
                     .then(response => {

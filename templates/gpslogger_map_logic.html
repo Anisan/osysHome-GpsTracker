@@ -754,27 +754,6 @@
       return `<span class="track-avatar track-avatar-default" style="background-color: ${pinColor}"><i class="fas fa-user"></i></span>`
     }
 
-    function padValue(value) {
-      return value < 10 ? '0' + value : String(value)
-    }
-
-    function toDatetimeLocalValue(dt) {
-      return dt.getFullYear() + '-' +
-        padValue(dt.getMonth() + 1) + '-' +
-        padValue(dt.getDate()) + 'T' +
-        padValue(dt.getHours()) + ':' +
-        padValue(dt.getMinutes())
-    }
-
-    function formatApiDate(dt) {
-      return dt.getFullYear() + '-' +
-        padValue(dt.getMonth() + 1) + '-' +
-        padValue(dt.getDate()) + ' ' +
-        padValue(dt.getHours()) + ':' +
-        padValue(dt.getMinutes()) + ':' +
-        padValue(dt.getSeconds())
-    }
-
     function createMarkerIcon(device) {
       const pinColor = getDeviceColor(device)
       return L.divIcon({
@@ -806,36 +785,29 @@
     }
 
     function getSelectedRange(state) {
+      const T = window.GpsTrackerTime
+      const tz = state.userTimezone || T.getUserTimezone()
       const period = state.periodSelect.value
-      const now = new Date()
-      const start = new Date(now)
-      const end = new Date(now)
 
       if (period === 'today') {
-        start.setHours(0, 0, 0, 0)
-        return { start, end }
+        return { start: T.startOfToday(tz), end: T.now(tz) }
       }
       if (period === 'last24h') {
-        start.setHours(start.getHours() - 24)
-        return { start, end }
+        return { start: T.last24hStart(tz), end: T.now(tz) }
       }
       if (period === 'yesterday') {
-        start.setDate(start.getDate() - 1)
-        start.setHours(0, 0, 0, 0)
-        end.setDate(end.getDate() - 1)
-        end.setHours(23, 59, 59, 999)
-        return { start, end }
+        return T.yesterdayRange(tz)
       }
       if (period === 'week') {
-        start.setDate(start.getDate() - 7)
-        return { start, end }
+        return { start: T.weekAgoStart(tz), end: T.now(tz) }
       }
       if (period === 'custom') {
-        const customStart = state.startInput.value ? new Date(state.startInput.value) : null
-        const customEnd = state.endInput.value ? new Date(state.endInput.value) : null
-        if (!customStart || !customEnd) return null
-        return { start: customStart, end: customEnd }
+        const start = T.datetimeLocalToApi(state.startInput.value)
+        const end = T.datetimeLocalToApi(state.endInput.value)
+        if (!start || !end) return null
+        return { start, end }
       }
+      return null
     }
 
     function setMessage(state, message) {
@@ -1021,8 +993,8 @@
         throw new Error('Invalid period')
       }
       let urlMethod = "/api/GpsTracker/log?&order_desc=true"
-      urlMethod += "&start_time=" + encodeURIComponent(formatApiDate(range.start))
-      urlMethod += "&end_time=" + encodeURIComponent(formatApiDate(range.end))
+      urlMethod += "&start_time=" + encodeURIComponent(range.start)
+      urlMethod += "&end_time=" + encodeURIComponent(range.end)
       const response = await axios.get(urlMethod)
       state.positions = response.data.result || []
     }
@@ -1135,6 +1107,7 @@
         toolbarToggle: root.querySelector('.js-map-toggle'),
         tracksContainer: root.querySelector('.js-map-tracks'),
         mapProvider: (root.dataset.mapProvider || 'openstreetmap').trim().toLowerCase(),
+        userTimezone: (root.dataset.userTimezone || '').trim() || (window.GpsTrackerTime && window.GpsTrackerTime.getUserTimezone()) || 'UTC',
         locationEditEnabled: root.dataset.locationEdit === '1',
         isLoading: false,
         i18n: getMapI18n(root),
@@ -1172,11 +1145,9 @@
         return null
       }
 
-      const now = new Date()
-      const dayStart = new Date(now)
-      dayStart.setHours(0, 0, 0, 0)
-      state.startInput.value = toDatetimeLocalValue(dayStart)
-      state.endInput.value = toDatetimeLocalValue(now)
+      const T = window.GpsTrackerTime
+      state.startInput.value = T.toDatetimeLocalValue(T.startOfTodayParts(state.userTimezone))
+      state.endInput.value = T.toDatetimeLocalValue(T.getPartsInTz(new Date(), state.userTimezone))
 
       state.refreshButton.addEventListener('click', () => refreshData(state))
       state.periodSelect.addEventListener('change', () => {

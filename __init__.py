@@ -2,7 +2,7 @@ from flask import render_template, request, jsonify, redirect
 import datetime
 from app.core.main.BasePlugin import BasePlugin
 from app.api import api
-from app.database import session_scope, get_now_to_utc
+from app.database import session_scope, get_now_to_utc, get_user_timezone
 from app.core.lib.object import updatePropertyThread
 from plugins.GpsTracker.utils import calculate_distance, in_location
 from plugins.GpsTracker.geocoding_providers import resolve_address, is_provider_disabled
@@ -51,19 +51,24 @@ class GpsTracker(BasePlugin):
                 self.saveConfig()
                 return redirect("GpsTracker")
 
-        return self.render("gpslogger.html", {
-            "form": settings,
-            "active_tab": "devices",
-            "map_provider": self._get_map_provider(),
-        })
+        return self.render("gpslogger.html", self._ui_context(
+            form=settings,
+            active_tab="devices",
+        ))
 
     def page(self, request):
-        return self.render("gpslogger_map.html", {
-            "map_provider": self._get_map_provider(),
-        })
+        return self.render("gpslogger_map.html", self._ui_context())
 
     def _get_map_provider(self):
         return (self.config.get("map_provider") or "openstreetmap").strip().lower()
+
+    def _ui_context(self, **extra):
+        ctx = {
+            "map_provider": self._get_map_provider(),
+            "user_timezone": get_user_timezone(),
+        }
+        ctx.update(extra)
+        return ctx
 
     def route_page(self):
         @self.blueprint.route("/page/" + self.name, methods=["GET", "POST"])

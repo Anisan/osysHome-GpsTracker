@@ -2,3 +2,112 @@
 <script src="{{ config.ASSETS_ROOT }}/plugins/vue/axios.min.js"></script>
 <link rel="stylesheet" href="//unpkg.com/leaflet/dist/leaflet.css" />
 <script src="//unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  window.GPS_TRACKER_TZ = {{ user_timezone|default('')|tojson }};
+  (function(global) {
+    function getUserTimezone() {
+      const tz = (global.GPS_TRACKER_TZ || '').trim()
+      if (tz) return tz
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone
+      } catch (e) {
+        return 'UTC'
+      }
+    }
+
+    function pad2(value) {
+      return value < 10 ? '0' + value : String(value)
+    }
+
+    function getPartsInTz(date, timeZone) {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone || getUserTimezone(),
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).formatToParts(date)
+      const pick = (type) => {
+        const item = parts.find(part => part.type === type)
+        return item ? item.value : '00'
+      }
+      return {
+        year: +pick('year'),
+        month: +pick('month'),
+        day: +pick('day'),
+        hour: +pick('hour'),
+        minute: +pick('minute'),
+        second: +pick('second')
+      }
+    }
+
+    function formatApiDateFromParts(parts) {
+      return parts.year + '-' + pad2(parts.month) + '-' + pad2(parts.day) + ' ' +
+        pad2(parts.hour) + ':' + pad2(parts.minute) + ':' + pad2(parts.second)
+    }
+
+    function formatApiDate(date, timeZone) {
+      return formatApiDateFromParts(getPartsInTz(date, timeZone))
+    }
+
+    function makeWallTime(year, month, day, hour, minute, second) {
+      return formatApiDateFromParts({ year, month, day, hour, minute, second })
+    }
+
+    function shiftDaysInTz(days, timeZone) {
+      const shifted = new Date(Date.now() + days * 86400000)
+      return getPartsInTz(shifted, timeZone)
+    }
+
+    function toDatetimeLocalValue(parts) {
+      return parts.year + '-' + pad2(parts.month) + '-' + pad2(parts.day) + 'T' +
+        pad2(parts.hour) + ':' + pad2(parts.minute)
+    }
+
+    function datetimeLocalToApi(value) {
+      if (!value) return null
+      const parts = value.split('T')
+      const datePart = parts[0]
+      const timePart = parts[1] || '00:00:00'
+      const time = timePart.length === 5 ? timePart + ':00' : timePart
+      return datePart + ' ' + time
+    }
+
+    global.GpsTrackerTime = {
+      getUserTimezone,
+      getPartsInTz,
+      formatApiDate,
+      toDatetimeLocalValue,
+      datetimeLocalToApi,
+      startOfToday(timeZone) {
+        const parts = getPartsInTz(new Date(), timeZone)
+        return makeWallTime(parts.year, parts.month, parts.day, 0, 0, 0)
+      },
+      startOfTodayParts(timeZone) {
+        const parts = getPartsInTz(new Date(), timeZone)
+        return { year: parts.year, month: parts.month, day: parts.day, hour: 0, minute: 0, second: 0 }
+      },
+      now(timeZone) {
+        return formatApiDate(new Date(), timeZone)
+      },
+      yesterdayRange(timeZone) {
+        const parts = shiftDaysInTz(-1, timeZone)
+        return {
+          start: makeWallTime(parts.year, parts.month, parts.day, 0, 0, 0),
+          end: makeWallTime(parts.year, parts.month, parts.day, 23, 59, 59)
+        }
+      },
+      last24hStart(timeZone) {
+        const parts = getPartsInTz(new Date(Date.now() - 86400000), timeZone)
+        return formatApiDateFromParts(parts)
+      },
+      weekAgoStart(timeZone) {
+        const parts = getPartsInTz(new Date(Date.now() - 7 * 86400000), timeZone)
+        return formatApiDateFromParts(parts)
+      }
+    }
+  })(window)
+</script>

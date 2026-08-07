@@ -30,6 +30,37 @@ def create_api_ns(instance:GpsTracker):
     _instance = instance
     return _api_ns
 
+
+def _ensure_local_datetimes(data: dict) -> dict:
+    """Ensure datetime fields are in user-local time (row2dict skips if profile timezone is empty)."""
+    from flask_login import current_user
+
+    if getattr(current_user, "timezone", None):
+        return data
+    for key, value in list(data.items()):
+        if isinstance(value, datetime.datetime):
+            data[key] = convert_utc_to_local(value)
+    return data
+
+
+def _gps_row2dict(row) -> dict:
+    return _ensure_local_datetimes(row2dict(row))
+
+
+def _parse_filter_time(value: str):
+    """Parse UI datetime string (user wall clock) to UTC for DB filtering."""
+    if not value:
+        return None
+    value = value.strip()
+    for fmt, size in (("%Y-%m-%d %H:%M:%S.%f", 23), ("%Y-%m-%d %H:%M:%S", 19)):
+        try:
+            parsed = datetime.datetime.strptime(value[:size], fmt)
+            return convert_local_to_utc(parsed)
+        except ValueError:
+            continue
+    return value
+
+
 @_api_ns.route("/devices", endpoint="gpstracker_devices")
 class GetDevices(Resource):
     @api_key_required
@@ -37,7 +68,7 @@ class GetDevices(Resource):
     def get(self):
         with session_scope() as session:
             devices = session.query(GpsDevice).all()
-            result = [row2dict(device) for device in devices]
+            result = [_gps_row2dict(device) for device in devices]
             for item in result:
                 if item['linked_object']:
                     item['user'] = getProperty(item['linked_object'] + ".description")
@@ -55,7 +86,7 @@ class EndpointGpsDevice(Resource):
         with session_scope() as session:
             device = session.query(GpsDevice).filter(GpsDevice.id == device_id).one_or_none()
             if device:
-                result = row2dict(device)
+                result = _gps_row2dict(device)
                 return {"success": True, "result": result}, 200
             return {"success": False, "msg": "Task not found"}, 404
     @api_key_required
@@ -92,7 +123,7 @@ class GetLocations(Resource):
     def get(self):
         with session_scope() as session:
             locations = session.query(GpsLocation).all()
-            result = [row2dict(location) for location in locations]
+            result = [_gps_row2dict(location) for location in locations]
             return {"success": True, "result": result}, 200
 
 @_api_ns.route('/location', methods=['POST'])
@@ -105,7 +136,7 @@ class EndpointGpsLocation(Resource):
         with session_scope() as session:
             location = session.query(GpsLocation).filter(GpsLocation.id == location_id).one_or_none()
             if location:
-                result = row2dict(location)
+                result = _gps_row2dict(location)
                 return {"success": True, "result": result}, 200
             return {"success": False, "msg": "Task not found"}, 404
     @api_key_required
@@ -171,9 +202,9 @@ class GetLogs(Resource):
             query = session.query(GpsPosition)
 
             if start_time:
-                query = query.filter(GpsPosition.added >= start_time)
+                query = query.filter(GpsPosition.added >= _parse_filter_time(start_time))
             if end_time:
-                query = query.filter(GpsPosition.added <= end_time)
+                query = query.filter(GpsPosition.added <= _parse_filter_time(end_time))
             if device_id:
                 query = query.filter(GpsPosition.device_id == device_id)
 
@@ -190,7 +221,7 @@ class GetLogs(Resource):
             else:
                 logs = query.all()
 
-            result = [row2dict(log) for log in logs]
+            result = [_gps_row2dict(log) for log in logs]
             data = {
                 "success": True,
                 "result": result,

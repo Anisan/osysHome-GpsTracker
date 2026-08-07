@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from sqlalchemy import delete, func
 
-from app.database import get_now_to_utc, session_scope
+from app.database import convert_utc_to_local, get_now_to_utc, session_scope
 from plugins.GpsTracker.models.GpsDevice import GpsDevice
 from plugins.GpsTracker.models.GpsPosition import GpsPosition
 from plugins.GpsTracker.utils import calculate_distance
@@ -25,7 +25,7 @@ def _dt_str(value: Optional[datetime]) -> Optional[str]:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%d %H:%M:%S")
+        return convert_utc_to_local(value).strftime("%Y-%m-%d %H:%M:%S")
     return str(value)
 
 

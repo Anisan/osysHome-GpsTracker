@@ -1,5 +1,6 @@
 <div id="gps_tracker_map_shared"
   data-map-provider="{{ map_provider|default('openstreetmap') }}"
+  data-user-timezone="{{ user_timezone|default('') }}"
   data-location-edit="{{ '1' if map_location_edit|default(false) else '0' }}"
   data-i18n-location-add-hint="{{ _('Click on the map to place a location') }}"
   data-i18n-location-confirm-delete="{{ _('Delete this location?') }}"

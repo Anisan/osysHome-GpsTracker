@@ -10,7 +10,7 @@ from plugins.GpsTracker.models.GpsDevice import GpsDevice
 from plugins.GpsTracker.models.GpsLocation import GpsLocation
 from plugins.GpsTracker.models.GpsPosition import GpsPosition
 from plugins.GpsTracker.forms.SettingForms import SettingsForm
-from app.authentication.handlers import public_endpoint
+from app.authentication.handlers import public_endpoint, handle_user_required
 
 class GpsTracker(BasePlugin):
 
@@ -19,8 +19,9 @@ class GpsTracker(BasePlugin):
         self.title = "GpsTracker"
         self.description = """GPS tracker"""
         self.category = "App"
-        self.version = "0.1"
+        self.version = "0.8"
         self.author = "Eraser"
+        self.actions = ["page"]
 
         from plugins.GpsTracker.api import create_api_ns
         api_ns = create_api_ns(self)
@@ -50,10 +51,25 @@ class GpsTracker(BasePlugin):
                 self.saveConfig()
                 return redirect("GpsTracker")
 
-        return self.render("gpslogger.html", {"form": settings})
+        return self.render("gpslogger.html", {
+            "form": settings,
+            "active_tab": "devices",
+            "map_provider": self._get_map_provider(),
+        })
+
+    def page(self, request):
+        return self.render("gpslogger_map.html", {
+            "map_provider": self._get_map_provider(),
+        })
 
     def _get_map_provider(self):
         return (self.config.get("map_provider") or "openstreetmap").strip().lower()
+
+    def route_page(self):
+        @self.blueprint.route("/page/" + self.name, methods=["GET", "POST"])
+        @handle_user_required
+        def module_page():
+            return self.page(request)
 
     def route_index(self):
         '''Support ulogger'''

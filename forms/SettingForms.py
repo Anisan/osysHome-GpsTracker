@@ -4,6 +4,21 @@ from wtforms.validators import Optional
 
 
 class SettingsForm(FlaskForm):
+    map_provider = SelectField(
+        "Map provider",
+        choices=[
+            ("openstreetmap", "OpenStreetMap"),
+            ("carto_light", "CartoDB Positron (Light)"),
+            ("carto_dark", "CartoDB Dark Matter"),
+            ("opentopomap", "OpenTopoMap"),
+            ("2gis", "2GIS"),
+            ("google_streets", "Google Map Streets"),
+            ("google_hybrid", "Google Map Hybrid"),
+            ("google_satellite", "Google Map Satellite"),
+            ("yandex", "Yandex"),
+        ],
+        validators=[Optional()],
+    )
     address_provider = SelectField(
         "Address provider",
         choices=[

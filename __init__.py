@@ -33,6 +33,7 @@ class GpsTracker(BasePlugin):
         settings = SettingsForm()
 
         if request.method == "GET":
+            settings.map_provider.data = self._get_map_provider()
             settings.address_provider.data = self.config.get("address_provider", "disabled")
             settings.google_api_key.data = self.config.get("google_api_key", "")
             settings.yandex_api_key.data = self.config.get("yandex_api_key", "")
@@ -40,6 +41,7 @@ class GpsTracker(BasePlugin):
             settings.mapsco_api_key.data = self.config.get("mapsco_api_key", "")
         else:
             if settings.validate_on_submit():
+                self.config["map_provider"] = settings.map_provider.data or "openstreetmap"
                 self.config["address_provider"] = settings.address_provider.data or "disabled"
                 self.config["google_api_key"] = (settings.google_api_key.data or "").strip()
                 self.config["yandex_api_key"] = (settings.yandex_api_key.data or "").strip()
@@ -49,6 +51,9 @@ class GpsTracker(BasePlugin):
                 return redirect("GpsTracker")
 
         return self.render("gpslogger.html", {"form": settings})
+
+    def _get_map_provider(self):
+        return (self.config.get("map_provider") or "openstreetmap").strip().lower()
 
     def route_index(self):
         '''Support ulogger'''

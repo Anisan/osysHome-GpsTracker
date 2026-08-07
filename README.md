@@ -2,80 +2,49 @@
 
 ![GpsTracker Icon](static/GpsTracker.png)
 
-GPS tracking system for receiving and managing GPS location data from mobile devices and trackers.
+GPS tracking for osysHome: receive coordinates from phones/trackers, manage geofences, history, and map UI.
 
-## Description
+## Features
 
-The `GpsTracker` module provides GPS tracking capabilities for the osysHome platform. It supports uLogger protocol and provides API endpoints for receiving GPS coordinates from mobile devices.
+- Receive coordinates via **uLogger**, **OwnTracks**, and REST
+- Devices (`GpsDevice`), geofences (`GpsLocation`), history (`GpsPosition`)
+- Home / geofence matching and updates to linked objects
+- Admin map: tracks, geofence edit, track-point move/delete
+- History stats and cleanup tools
+- Reverse geocoding providers (optional)
+- MCP support (see `docs/mcp.ru.md`)
 
-## Main Features
+## Admin panel
 
-- ✅ **GPS Tracking**: Receive GPS coordinates from devices
-- ✅ **uLogger Support**: Compatible with uLogger protocol
-- ✅ **Device Management**: Manage multiple GPS devices
-- ✅ **Location History**: Store location history
-- ✅ **Distance Calculation**: Calculate distance from home location
-- ✅ **API Endpoints**: RESTful API for GPS data
+Tabs: Devices, Location, Log, History, Map, Settings.
 
-## Admin Panel
+Map editing (geofences and track points) is available on the **Map** tab only. Fullscreen `/page/GpsTracker` is view-only.
 
-The module provides an admin interface for:
-- Viewing GPS devices
-- Viewing location history
-- Managing devices
+Details: `docs/map-ui.md`, `docs/map-ui.ru.md`.
 
-## API
+## Protocols and API
 
-The module provides API endpoints:
-- **POST /client/index.php**: uLogger-compatible endpoint
-- **GET /api/GpsTracker/...**: RESTful API endpoints
+- uLogger: `/GpsTracker/client/index.php`
+- OwnTracks: `POST /api/GpsTracker/owntracks?apikey=...`
+- REST: `docs/rest-api.ru.md`
 
-## Supported Protocols
+## Address detection
 
-- **uLogger**: Standard uLogger protocol for GPS tracking apps
+- `docs/address-geocoding.md`
+- `docs/address-geocoding.ru.md`
 
-## Usage
+## Documentation index
 
-### Receiving GPS Data
-
-1. Configure GPS tracking app (e.g., uLogger)
-2. Set endpoint URL: `http://your-server/GpsTracker/client/index.php`
-3. Authenticate with username
-4. GPS data received automatically
-
-## Technical Details
-
-- **Protocol**: uLogger-compatible HTTP POST
-- **Data Storage**: Database storage for locations
-- **Distance Calculation**: Haversine formula for distance
-- **Home Detection**: Automatic home location detection
-
-## Address Detection
-
-Address detection (reverse geocoding) is documented in:
-
-- `docs/address-geocoding.md` (English)
-- `docs/address-geocoding.ru.md` (Russian)
+- `docs/index.ru.md` (Russian)
 
 ## Version
 
-Current version: **0.1**
+**0.7**
 
 ## Category
 
 App
 
-## Requirements
-
-- Flask
-- SQLAlchemy
-- osysHome core system
-
 ## Author
 
 Eraser
-
-## License
-
-See the main osysHome project license
-

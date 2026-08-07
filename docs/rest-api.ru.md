@@ -69,5 +69,8 @@ API key передаётся:
 
 ## Обновление/удаление точек (для опытных)
 - `PUT /api/GpsTracker/position/<position_id>` — изменить `lat`/`lon`
+  - тело JSON: `{ "lat": ..., "lon": ... }` (допускается и `lng`)
 - `DELETE /api/GpsTracker/position/<position_id>` — удалить запись
+
+Эти методы использует карта в админке при редактировании точек трека (см. `map-ui.ru.md`).
 

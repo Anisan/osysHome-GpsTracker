@@ -45,8 +45,11 @@
 ## Далее по документации
 - `using-in-osyshome.ru.md` — как именно модуль связан с объектами и какие свойства он обновляет
 - `locations-and-home.ru.md` — как работает “дом” и геозоны
+- `map-ui.ru.md` — карта в админке: треки, редактирование геозон и точек
 - `protocols-ulogger.ru.md` — uLogger и примеры запросов
 - `protocols-owntracks.ru.md` — OwnTracks и JSON-формат
 - `rest-api.ru.md` — REST API osysHome для устройств/геозон/логов/ручной отправки
 - `examples.ru.md` — несколько готовых сценариев (с примерами)
+- `address-geocoding.ru.md` — reverse geocoding и провайдеры адреса
+- `mcp.ru.md` — MCP-инструменты модуля
 

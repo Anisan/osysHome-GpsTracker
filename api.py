@@ -4,7 +4,7 @@ from sqlalchemy import delete, desc
 from app.api.decorators import api_key_required
 from app.authentication.handlers import handle_user_required
 from app.api.models import model_404, model_result
-from app.database import row2dict, session_scope, convert_local_to_utc, convert_utc_to_local
+from app.database import row2dict, session_scope, convert_local_to_utc, convert_utc_to_local, get_user_timezone, get_now_to_utc
 from app.core.lib.object import getProperty, getObject
 from plugins.GpsTracker import GpsTracker
 from plugins.GpsTracker import history_ops
@@ -52,13 +52,44 @@ def _parse_filter_time(value: str):
     if not value:
         return None
     value = value.strip()
+    if len(value) >= 13 and value[11:13] == "24":
+        value = value[:11] + "00" + value[13:]
     for fmt, size in (("%Y-%m-%d %H:%M:%S.%f", 23), ("%Y-%m-%d %H:%M:%S", 19)):
         try:
             parsed = datetime.datetime.strptime(value[:size], fmt)
-            return convert_local_to_utc(parsed)
+            return convert_local_to_utc(parsed, timezone=get_user_timezone())
         except ValueError:
             continue
-    return value
+    raise ValueError(f"Invalid datetime filter: {value}")
+
+
+def _period_bounds(period: str):
+    """Return UTC start/end for named periods using the authenticated user's timezone."""
+    period = (period or "").strip().lower()
+    tz = get_user_timezone()
+    now_local = convert_utc_to_local(get_now_to_utc(), tz)
+    today = now_local.date()
+
+    if period == "today":
+        start_local = datetime.datetime.combine(today, datetime.time.min)
+        end_local = datetime.datetime.combine(today, datetime.time(23, 59, 59))
+    elif period == "yesterday":
+        day = today - datetime.timedelta(days=1)
+        start_local = datetime.datetime.combine(day, datetime.time.min)
+        end_local = datetime.datetime.combine(day, datetime.time(23, 59, 59))
+    elif period == "last24h":
+        end_local = now_local.replace(microsecond=0)
+        start_local = end_local - datetime.timedelta(hours=24)
+    elif period == "week":
+        end_local = now_local.replace(microsecond=0)
+        start_local = end_local - datetime.timedelta(days=7)
+    else:
+        raise ValueError(f"Unsupported period: {period}")
+
+    return (
+        convert_local_to_utc(start_local, timezone=tz),
+        convert_local_to_utc(end_local, timezone=tz),
+    )
 
 
 @_api_ns.route("/devices", endpoint="gpstracker_devices")
@@ -175,6 +206,7 @@ _parser.add_argument('device_id', type=str, help='Device ID to filter logs')
 _parser.add_argument('page', type=int, default=1, help='Page number for pagination (default is 1)')
 _parser.add_argument('per_page', type=int, help='Number of items per page (default is 10)')
 _parser.add_argument('order_desc', type=bool, help='Whether to order results in descending order')
+_parser.add_argument('period', type=str, help='Named period: today, yesterday, last24h, week')
 
 
 @_api_ns.route("/log", endpoint="gpstracker_logs")
@@ -188,12 +220,14 @@ class GetLogs(Resource):
         'page': 'Page number for pagination',
         'per_page': 'Number of items per page',
         'order_desc': 'Whether to order results in descending order',
+        'period': 'Named period: today, yesterday, last24h, week',
     })
     def get(self):
         args = _parser.parse_args()
 
         start_time = args.get('start_time')
         end_time = args.get('end_time')
+        period = args.get('period')
         device_id = args.get('device_id')
         page = args.get('page', None)
         per_page = args.get('per_page', None)
@@ -201,10 +235,27 @@ class GetLogs(Resource):
         with session_scope() as session:
             query = session.query(GpsPosition)
 
+            if period:
+                try:
+                    start_time, end_time = _period_bounds(period)
+                except ValueError as exc:
+                    return {"success": False, "error": str(exc)}, 400
+            else:
+                if start_time:
+                    try:
+                        start_time = _parse_filter_time(start_time)
+                    except ValueError as exc:
+                        return {"success": False, "error": str(exc)}, 400
+                if end_time:
+                    try:
+                        end_time = _parse_filter_time(end_time)
+                    except ValueError as exc:
+                        return {"success": False, "error": str(exc)}, 400
+
             if start_time:
-                query = query.filter(GpsPosition.added >= _parse_filter_time(start_time))
+                query = query.filter(GpsPosition.added >= start_time)
             if end_time:
-                query = query.filter(GpsPosition.added <= _parse_filter_time(end_time))
+                query = query.filter(GpsPosition.added <= end_time)
             if device_id:
                 query = query.filter(GpsPosition.device_id == device_id)
 
@@ -420,7 +471,7 @@ class OwnTracks(Resource):
                 battery=data["batt"],
                 charging=data["bs"] == 2,
                 provider='owntracks',
-                added=convert_local_to_utc(datetime.datetime.fromtimestamp(data["tst"]))
+                added=datetime.datetime.fromtimestamp(data["tst"], tz=datetime.timezone.utc).replace(tzinfo=None)
             )
             current_time = time.time()
             last_execution = cache.get("gps_ls_" + data["tid"])

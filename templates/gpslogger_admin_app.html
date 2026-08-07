@@ -28,8 +28,18 @@
             await this.fetchObjects()
             await this.fetchDevices()
             await this.fetchLocations()
-            await this.fetchPositions()
             await this.fetchHistoryStats()
+        },
+        mounted() {
+            const logTab = document.querySelector('a[data-bs-target="#positions"]')
+            if (logTab) {
+                logTab.addEventListener('shown.bs.tab', () => {
+                    this.fetchPositions()
+                })
+            }
+            if (logTab && logTab.classList.contains('active')) {
+                this.fetchPositions()
+            }
         },
         computed: {
             objectOptions() {
@@ -102,13 +112,7 @@
             },
             fetchPositions() {
                 this.loading = "positions"
-                const T = window.GpsTrackerTime
-                const tz = T.getUserTimezone()
-                let urlMethod = "/api/GpsTracker/log?&order_desc=true"
-                urlMethod += "&start_time=" + encodeURIComponent(T.startOfToday(tz))
-                urlMethod += "&end_time=" + encodeURIComponent(T.now(tz))
-
-                return axios.get(urlMethod)
+                return axios.get('/api/GpsTracker/log?order_desc=true&period=today')
                     .then(response => {
                         this.positions = response.data.result
                         this.loading = ""

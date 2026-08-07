@@ -988,13 +988,18 @@
     }
 
     async function fetchPositions(state) {
-      const range = getSelectedRange(state)
-      if (!range || range.start > range.end) {
-        throw new Error('Invalid period')
+      const period = state.periodSelect.value
+      let urlMethod = "/api/GpsTracker/log?order_desc=true"
+      if (period === 'custom') {
+        const range = getSelectedRange(state)
+        if (!range || range.start > range.end) {
+          throw new Error('Invalid period')
+        }
+        urlMethod += "&start_time=" + encodeURIComponent(range.start)
+        urlMethod += "&end_time=" + encodeURIComponent(range.end)
+      } else {
+        urlMethod += "&period=" + encodeURIComponent(period)
       }
-      let urlMethod = "/api/GpsTracker/log?&order_desc=true"
-      urlMethod += "&start_time=" + encodeURIComponent(range.start)
-      urlMethod += "&end_time=" + encodeURIComponent(range.end)
       const response = await axios.get(urlMethod)
       state.positions = response.data.result || []
     }

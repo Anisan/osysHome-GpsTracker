@@ -377,7 +377,8 @@ class GpsPositionResource(Resource):
     def get(self):
         """ Save GPS position """
         args = self.get_parser.parse_args()
-        _instance.addGpsPosition(**args)
+        if _instance.addGpsPosition(**args) is None:
+            return {'success': False, 'msg': 'Position rejected by quality filter'}, 200
         return {'success': True}, 200
 
     @_api_ns.expect(gps_position_model)
@@ -398,7 +399,7 @@ class GpsPositionResource(Resource):
         address = data.get('address')
         added = data.get('added')
 
-        _instance.addGpsPosition(
+        if _instance.addGpsPosition(
             device=device_name,
             lat=lat,
             lon=lon,
@@ -410,7 +411,8 @@ class GpsPositionResource(Resource):
             provider=provider,
             address=address,
             added=added
-        )
+        ) is None:
+            return {'success': False, 'msg': 'Position rejected by quality filter'}, 200
 
         return {'success': True}, 201
 

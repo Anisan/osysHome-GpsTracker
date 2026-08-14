@@ -41,6 +41,8 @@ _PLUGIN_NOTES = [
     "add_position runs the same pipeline as REST/OwnTracks/uLogger: geofence match, reverse geocoding, linked_object updates.",
     "address_provider in config controls reverse geocoding (disabled, openstreetmap, google, yandex, ...).",
     "Pass address in add_position to skip reverse geocoding for that point.",
+    "max_accuracy_m in config: discard positions when reported accuracy (meters) exceeds this value; 0 = disabled.",
+    "max_speed_kmh in config: discard positions when implied speed from the previous point exceeds this value; 0 = disabled.",
     "Use resolve_address to preview geocoding at lat/lon with current plugin config.",
     "list_entities on positions defaults to newest-first (order_desc=true).",
     "Use get_history_stats for totals/per-device counts and optimization suggestions.",
@@ -252,6 +254,18 @@ def mcp_config_schema() -> dict:
             "yandex_api_key": {"type": "string", "writeOnly": True},
             "locationiq_api_key": {"type": "string", "writeOnly": True},
             "mapsco_api_key": {"type": "string", "writeOnly": True},
+            "max_accuracy_m": {
+                "type": "number",
+                "minimum": 0,
+                "default": 0,
+                "description": "Discard positions when reported accuracy (meters) exceeds this value; 0 disables filtering",
+            },
+            "max_speed_kmh": {
+                "type": "number",
+                "minimum": 0,
+                "default": 0,
+                "description": "Discard positions when implied speed from the previous point (km/h) exceeds this value; 0 disables filtering",
+            },
         },
     }
 
@@ -661,7 +675,7 @@ def mcp_invoke(operation: str, params: dict = None) -> dict:
         instance = _plugin_instance()
         if instance is None:
             raise ValueError("GpsTracker plugin not loaded")
-        instance.addGpsPosition(
+        if instance.addGpsPosition(
             device=device,
             lat=float(lat),
             lon=float(lon),
@@ -673,7 +687,8 @@ def mcp_invoke(operation: str, params: dict = None) -> dict:
             provider=params.get("provider"),
             address=params.get("address"),
             added=_parse_datetime(params.get("added")),
-        )
+        ) is None:
+            raise ValueError("Position rejected: quality filter (accuracy or speed)")
         latest = _lookup_latest_position(device_key=device)
         return {
             "ok": True,

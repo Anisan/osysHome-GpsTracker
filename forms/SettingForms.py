@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import SelectField, SubmitField, StringField
-from wtforms.validators import Optional
+from wtforms import IntegerField, SelectField, SubmitField, StringField
+from wtforms.validators import NumberRange, Optional
 
 
 class SettingsForm(FlaskForm):
@@ -36,5 +36,15 @@ class SettingsForm(FlaskForm):
     yandex_api_key = StringField("Yandex API key", validators=[Optional()])
     locationiq_api_key = StringField("LocationIQ API key", validators=[Optional()])
     mapsco_api_key = StringField("maps.co API key", validators=[Optional()])
+    max_accuracy_m = IntegerField(
+        "Max accuracy (m)",
+        validators=[Optional(), NumberRange(min=0)],
+        default=0,
+    )
+    max_speed_kmh = IntegerField(
+        "Max speed (km/h)",
+        validators=[Optional(), NumberRange(min=0)],
+        default=0,
+    )
     submit = SubmitField("Submit")
 

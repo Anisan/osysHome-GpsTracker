@@ -29,6 +29,16 @@
             <label class="form-label">{{ _('maps.co API key') }}</label>
             {{ form.mapsco_api_key(class="form-control", placeholder="maps.co API key (optional)") }}
           </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Max accuracy (m)') }}</label>
+            {{ form.max_accuracy_m(class="form-control", type="number", min="0", step="1", placeholder="0") }}
+            <div class="form-text">{{ _('Points with accuracy above this value are discarded. 0 = disabled.') }}</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Max speed (km/h)') }}</label>
+            {{ form.max_speed_kmh(class="form-control", type="number", min="0", step="1", placeholder="0") }}
+            <div class="form-text">{{ _('Points implying movement faster than this speed are discarded. 0 = disabled.') }}</div>
+          </div>
 
           <button type="submit" class="btn btn-primary">{{ _('Save') }}</button>
         </form>

@@ -1,5 +1,6 @@
 from flask import render_template, request, jsonify, redirect
 import datetime
+from sqlalchemy import desc
 from app.core.main.BasePlugin import BasePlugin
 from app.api import api
 from app.database import session_scope, get_now_to_utc, get_user_timezone
@@ -19,7 +20,7 @@ class GpsTracker(BasePlugin):
         self.title = "GpsTracker"
         self.description = """GPS tracker"""
         self.category = "App"
-        self.version = "0.8"
+        self.version = "0.10"
         self.author = "Eraser"
         self.actions = ["page"]
 
@@ -40,6 +41,8 @@ class GpsTracker(BasePlugin):
             settings.yandex_api_key.data = self.config.get("yandex_api_key", "")
             settings.locationiq_api_key.data = self.config.get("locationiq_api_key", "")
             settings.mapsco_api_key.data = self.config.get("mapsco_api_key", "")
+            settings.max_accuracy_m.data = self.config.get("max_accuracy_m") or 0
+            settings.max_speed_kmh.data = self.config.get("max_speed_kmh") or 0
         else:
             if settings.validate_on_submit():
                 self.config["map_provider"] = settings.map_provider.data or "openstreetmap"
@@ -48,6 +51,8 @@ class GpsTracker(BasePlugin):
                 self.config["yandex_api_key"] = (settings.yandex_api_key.data or "").strip()
                 self.config["locationiq_api_key"] = (settings.locationiq_api_key.data or "").strip()
                 self.config["mapsco_api_key"] = (settings.mapsco_api_key.data or "").strip()
+                self.config["max_accuracy_m"] = max(0, int(settings.max_accuracy_m.data or 0))
+                self.config["max_speed_kmh"] = max(0, int(settings.max_speed_kmh.data or 0))
                 self.saveConfig()
                 return redirect("GpsTracker")
 
@@ -61,6 +66,63 @@ class GpsTracker(BasePlugin):
 
     def _get_map_provider(self):
         return (self.config.get("map_provider") or "openstreetmap").strip().lower()
+
+    def _get_max_accuracy_m(self):
+        value = self.config.get("max_accuracy_m")
+        if value in (None, "", 0, "0"):
+            return None
+        try:
+            limit = float(value)
+        except (TypeError, ValueError):
+            return None
+        return limit if limit > 0 else None
+
+    def _is_accuracy_acceptable(self, accuracy):
+        limit = self._get_max_accuracy_m()
+        if limit is None or accuracy is None:
+            return True
+        return accuracy <= limit
+
+    def _get_max_speed_kmh(self):
+        value = self.config.get("max_speed_kmh")
+        if value in (None, "", 0, "0"):
+            return None
+        try:
+            limit = float(value)
+        except (TypeError, ValueError):
+            return None
+        return limit if limit > 0 else None
+
+    def _is_speed_acceptable(self, session, device_pk, lat, lon, added):
+        limit = self._get_max_speed_kmh()
+        if limit is None:
+            return True
+        prev = (
+            session.query(GpsPosition)
+            .filter(GpsPosition.device_id == device_pk)
+            .order_by(desc(GpsPosition.added), desc(GpsPosition.id))
+            .first()
+        )
+        if prev is None or prev.added is None:
+            return True
+        point_time = added if added else get_now_to_utc()
+        delta_sec = abs((point_time - prev.added).total_seconds())
+        if delta_sec < 1:
+            delta_sec = 1
+        distance_m = calculate_distance(prev.lat, prev.lon, lat, lon)
+        speed_kmh = distance_m * 3.6 / delta_sec
+        if speed_kmh <= limit:
+            return True
+        self.logger.debug(
+            "GPS position rejected: implied speed %.1f km/h exceeds limit %s km/h "
+            "(distance %.0f m in %.1f s, device_pk=%s)",
+            speed_kmh,
+            limit,
+            distance_m,
+            delta_sec,
+            device_pk,
+        )
+        return False
 
     def _ui_context(self, **extra):
         ctx = {
@@ -142,6 +204,14 @@ class GpsTracker(BasePlugin):
                 return jsonify(response), 200
 
     def addGpsPosition(self, device:str, lat:float, lon:float, alt:float = None, accuracy:float = None, speed:float = None, battery:float = None, charging:bool = None, provider:str=None, address:str = None, added:datetime = None):
+        if not self._is_accuracy_acceptable(accuracy):
+            self.logger.debug(
+                "GPS position rejected: accuracy %s m exceeds limit %s m (device=%s)",
+                accuracy,
+                self._get_max_accuracy_m(),
+                device,
+            )
+            return None
         with session_scope() as session:
             device_rec = session.query(GpsDevice).where(GpsDevice.device_id == device).one_or_none()
             if not device_rec:
@@ -151,6 +221,9 @@ class GpsTracker(BasePlugin):
                 )
                 session.add(device_rec)
                 session.commit()
+
+            if not self._is_speed_acceptable(session, device_rec.id, lat, lon, added):
+                return None
 
             device_rec.lat = lat
             device_rec.lon = lon

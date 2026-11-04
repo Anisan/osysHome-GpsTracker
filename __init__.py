@@ -20,7 +20,7 @@ class GpsTracker(BasePlugin):
         self.title = "GpsTracker"
         self.description = """GPS tracker"""
         self.category = "App"
-        self.version = "0.10"
+        self.version = "0.11"
         self.author = "Eraser"
         self.actions = ["page"]
 
@@ -292,8 +292,11 @@ class GpsTracker(BasePlugin):
                 if should_push_address or has_incoming_address:
                     updatePropertyThread(device_rec.linked_object + ".address", address, source=self.name)
                 updatePropertyThread(device_rec.linked_object + ".home_distance", distance, source=self.name)
-                updatePropertyThread(device_rec.linked_object + ".battery", battery, source=self.name)
-                updatePropertyThread(device_rec.linked_object + ".isCharging", charging, source=self.name)
+                # Не передаём в связанный объект недоступные данные (None)
+                if battery is not None:
+                    updatePropertyThread(device_rec.linked_object + ".battery", battery, source=self.name)
+                if charging is not None:
+                    updatePropertyThread(device_rec.linked_object + ".isCharging", charging, source=self.name)
 
             return gps_position
 

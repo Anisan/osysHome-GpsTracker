@@ -20,9 +20,9 @@ class GpsTracker(BasePlugin):
         self.title = "GpsTracker"
         self.description = """GPS tracker"""
         self.category = "App"
-        self.version = "0.11"
+        self.version = "0.12"
         self.author = "Eraser"
-        self.actions = ["page"]
+        self.actions = ["page", "widget"]
 
         from plugins.GpsTracker.api import create_api_ns
         api_ns = create_api_ns(self)
@@ -63,6 +63,12 @@ class GpsTracker(BasePlugin):
 
     def page(self, request):
         return self.render("gpslogger_map.html", self._ui_context())
+
+    def widgets(self):
+        return [{"name": "map", "description": "GPS map with tracks"}]
+
+    def widget(self, name=None):
+        return self.render("widget_gps_map.html", self._ui_context())
 
     def _get_map_provider(self):
         return (self.config.get("map_provider") or "openstreetmap").strip().lower()
